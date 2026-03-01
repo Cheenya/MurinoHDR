@@ -8,9 +8,17 @@ using UnityEngine;
 namespace MurinoHDR.Editor
 {
 
+[InitializeOnLoad]
 public static class MvpSceneAuthoringTools
 {
     private const string GameScenePath = "Assets/_Game/Scenes/Game.unity";
+    private const string EnvironmentRootName = "MVP_Environment";
+
+    static MvpSceneAuthoringTools()
+    {
+        EditorSceneManager.sceneOpened += OnSceneOpened;
+        EditorApplication.delayCall += TryBuildForActiveGameScene;
+    }
 
     [MenuItem("Tools/Murino/Build MVP In Game Scene")]
     public static void BuildMvpInGameScene()
@@ -44,6 +52,49 @@ public static class MvpSceneAuthoringTools
         }
 
         Selection.activeGameObject = GameObject.Find("MVP_Environment");
+    }
+
+    private static void OnSceneOpened(UnityEngine.SceneManagement.Scene scene, OpenSceneMode mode)
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            return;
+        }
+
+        if (scene.path != GameScenePath)
+        {
+            return;
+        }
+
+        if (GameObject.Find(EnvironmentRootName) == null)
+        {
+            BuildMvpContent();
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("[GEN] Auto-built MVP content for Game scene");
+        }
+    }
+
+    private static void TryBuildForActiveGameScene()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            return;
+        }
+
+        var scene = EditorSceneManager.GetActiveScene();
+        if (scene.path != GameScenePath)
+        {
+            return;
+        }
+
+        if (GameObject.Find(EnvironmentRootName) == null)
+        {
+            BuildMvpContent();
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("[GEN] Auto-built MVP content for active Game scene");
+        }
     }
 }
 }

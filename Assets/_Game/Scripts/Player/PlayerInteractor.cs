@@ -1,4 +1,4 @@
-using MurinoHDR.Interaction;
+Ôªøusing MurinoHDR.Interaction;
 using MurinoHDR.UI;
 using UnityEngine;
 
@@ -29,8 +29,8 @@ public sealed class PlayerInteractor : MonoBehaviour
         {
             if (interactable.CanInteract(gameObject))
             {
-                InteractionPromptUI.Instance?.Show($"Õ‡ÊÏËÚÂ E: {interactable.GetPrompt(gameObject)}");
-                if (Input.GetKeyDown(KeyCode.E))
+                InteractionPromptUI.Instance?.Show($"–ù–∞–∂–º–∏—Ç–µ E: {interactable.GetPrompt(gameObject)}");
+                if (PlayerInputAdapter.WasInteractPressed())
                 {
                     interactable.Interact(gameObject);
                 }
@@ -42,5 +42,3 @@ public sealed class PlayerInteractor : MonoBehaviour
     }
 }
 }
-
-

@@ -1,4 +1,7 @@
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace MurinoHDR.Player
 {
@@ -20,11 +23,12 @@ public sealed class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
-        var moveInput = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical"));
+        var move2D = PlayerInputAdapter.ReadMove();
+        var moveInput = new Vector3(move2D.x, 0f, move2D.y);
         moveInput = Vector3.ClampMagnitude(moveInput, 1f);
 
         var speed = _walkSpeed;
-        if (Input.GetKey(KeyCode.LeftShift))
+        if (PlayerInputAdapter.IsSprintHeld())
         {
             speed *= _sprintMultiplier;
         }
@@ -40,6 +44,58 @@ public sealed class PlayerMovement : MonoBehaviour
         movement.y = _verticalVelocity;
 
         _characterController.Move(movement * Time.deltaTime);
+    }
+}
+
+internal static class PlayerInputAdapter
+{
+    public static Vector2 ReadMove()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+        {
+            var move = Vector2.zero;
+            if (Keyboard.current.wKey.isPressed) move.y += 1f;
+            if (Keyboard.current.sKey.isPressed) move.y -= 1f;
+            if (Keyboard.current.dKey.isPressed) move.x += 1f;
+            if (Keyboard.current.aKey.isPressed) move.x -= 1f;
+            return Vector2.ClampMagnitude(move, 1f);
+        }
+#endif
+        return new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+    }
+
+    public static Vector2 ReadLook()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Mouse.current != null)
+        {
+            return Mouse.current.delta.ReadValue();
+        }
+#endif
+        return new Vector2(Input.GetAxis("Mouse X") * 12f, Input.GetAxis("Mouse Y") * 12f);
+    }
+
+    public static bool IsSprintHeld()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+        {
+            return Keyboard.current.leftShiftKey.isPressed;
+        }
+#endif
+        return Input.GetKey(KeyCode.LeftShift);
+    }
+
+    public static bool WasInteractPressed()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+        {
+            return Keyboard.current.eKey.wasPressedThisFrame;
+        }
+#endif
+        return Input.GetKeyDown(KeyCode.E);
     }
 }
 }

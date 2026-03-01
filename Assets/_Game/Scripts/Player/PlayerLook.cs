@@ -5,7 +5,7 @@ namespace MurinoHDR.Player
 
 public sealed class PlayerLook : MonoBehaviour
 {
-    [SerializeField] private float _mouseSensitivity = 180f;
+    [SerializeField] private float _mouseSensitivity = 0.08f;
     [SerializeField] private float _pitchMin = -75f;
     [SerializeField] private float _pitchMax = 75f;
 
@@ -21,8 +21,9 @@ public sealed class PlayerLook : MonoBehaviour
 
     private void Update()
     {
-        var mouseX = Input.GetAxis("Mouse X") * _mouseSensitivity * Time.deltaTime;
-        var mouseY = Input.GetAxis("Mouse Y") * _mouseSensitivity * Time.deltaTime;
+        var look = PlayerInputAdapter.ReadLook();
+        var mouseX = look.x * _mouseSensitivity;
+        var mouseY = look.y * _mouseSensitivity;
 
         _pitch -= mouseY;
         _pitch = Mathf.Clamp(_pitch, _pitchMin, _pitchMax);

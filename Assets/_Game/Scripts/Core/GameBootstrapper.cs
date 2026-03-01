@@ -1,4 +1,5 @@
 using MurinoHDR.Audio;
+using MurinoHDR.Generation;
 using MurinoHDR.Interaction;
 using MurinoHDR.Player;
 using MurinoHDR.Save;
@@ -104,28 +105,7 @@ public sealed class GameBootstrapper : MonoBehaviour
             uiObject.AddComponent<InteractionPromptUI>();
         }
 
-        if (GameObject.Find("Ground") == null)
-        {
-            var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            ground.name = "Ground";
-            ground.transform.position = Vector3.zero;
-        }
-
-        if (GameObject.Find("InteractableCube") == null)
-        {
-            var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            cube.name = "InteractableCube";
-            cube.transform.position = new Vector3(0f, 1f, 4f);
-            cube.AddComponent<DebugDoorInteractable>();
-        }
-
-        if (FindFirstObjectByType<Light>() == null)
-        {
-            var lightObject = new GameObject("Directional Light");
-            var lightComponent = lightObject.AddComponent<Light>();
-            lightComponent.type = LightType.Directional;
-            lightObject.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
-        }
+        MvpEnvironmentBuilder.EnsureEnvironment();
     }
 
     private static void SpawnPlayer()
@@ -142,6 +122,24 @@ public sealed class GameBootstrapper : MonoBehaviour
         player.AddComponent<PlayerMovement>();
         player.AddComponent<PlayerLook>();
         player.AddComponent<PlayerInteractor>();
+
+        var visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        visual.name = "BodyVisual";
+        visual.transform.SetParent(player.transform, false);
+        visual.transform.localScale = new Vector3(0.75f, 0.95f, 0.75f);
+        visual.transform.localPosition = new Vector3(0f, 0.9f, 0f);
+
+        var visualCollider = visual.GetComponent<Collider>();
+        if (visualCollider != null)
+        {
+            Destroy(visualCollider);
+        }
+
+        var bodyRenderer = visual.GetComponent<Renderer>();
+        if (bodyRenderer != null)
+        {
+            bodyRenderer.material.color = new Color(0.22f, 0.35f, 0.48f);
+        }
 
         var cameraObject = new GameObject("Main Camera");
         cameraObject.tag = "MainCamera";

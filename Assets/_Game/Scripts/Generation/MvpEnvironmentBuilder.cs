@@ -18,6 +18,22 @@ public static class MvpEnvironmentBuilder
             return;
         }
 
+        BuildEnvironment();
+    }
+
+    public static void RebuildEnvironment()
+    {
+        var existingRoot = GameObject.Find(RootName);
+        if (existingRoot != null)
+        {
+            Object.DestroyImmediate(existingRoot);
+        }
+
+        BuildEnvironment();
+    }
+
+    private static void BuildEnvironment()
+    {
         var root = new GameObject(RootName);
         BuildLighting(root.transform);
 

@@ -1,6 +1,7 @@
 using UnityEngine;
 
-namespace MurinoHDR.UI;
+namespace MurinoHDR.UI
+{
 
 public sealed class InteractionPromptUI : MonoBehaviour
 {
@@ -53,3 +54,6 @@ public sealed class InteractionPromptUI : MonoBehaviour
         GUI.Box(rect, _text);
     }
 }
+}
+
+

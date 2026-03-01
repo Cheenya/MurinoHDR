@@ -1,6 +1,7 @@
 using UnityEngine;
 
-namespace MurinoHDR.Player;
+namespace MurinoHDR.Player
+{
 
 [RequireComponent(typeof(CharacterController))]
 public sealed class PlayerMovement : MonoBehaviour
@@ -41,3 +42,6 @@ public sealed class PlayerMovement : MonoBehaviour
         _characterController.Move(movement * Time.deltaTime);
     }
 }
+}
+
+

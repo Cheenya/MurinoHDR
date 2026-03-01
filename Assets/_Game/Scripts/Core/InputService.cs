@@ -1,6 +1,7 @@
 using UnityEngine;
 
-namespace MurinoHDR.Core;
+namespace MurinoHDR.Core
+{
 
 public sealed class InputService : MonoBehaviour
 {
@@ -24,3 +25,6 @@ public sealed class InputService : MonoBehaviour
         return Input.GetKeyDown(KeyCode.E);
     }
 }
+}
+
+

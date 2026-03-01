@@ -1,6 +1,7 @@
 using UnityEngine;
 
-namespace MurinoHDR.Audio;
+namespace MurinoHDR.Audio
+{
 
 public sealed class AudioManager : MonoBehaviour
 {
@@ -9,3 +10,6 @@ public sealed class AudioManager : MonoBehaviour
         Debug.Log($"[AUDIO] PlayOneShot: {eventId}");
     }
 }
+}
+
+

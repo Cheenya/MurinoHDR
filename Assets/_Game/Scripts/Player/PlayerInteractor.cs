@@ -2,7 +2,8 @@ using MurinoHDR.Interaction;
 using MurinoHDR.UI;
 using UnityEngine;
 
-namespace MurinoHDR.Player;
+namespace MurinoHDR.Player
+{
 
 public sealed class PlayerInteractor : MonoBehaviour
 {
@@ -40,3 +41,6 @@ public sealed class PlayerInteractor : MonoBehaviour
         InteractionPromptUI.Instance?.Hide();
     }
 }
+}
+
+

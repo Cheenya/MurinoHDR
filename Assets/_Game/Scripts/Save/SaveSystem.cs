@@ -2,7 +2,8 @@ using System;
 using System.IO;
 using UnityEngine;
 
-namespace MurinoHDR.Save;
+namespace MurinoHDR.Save
+{
 
 [Serializable]
 public sealed class SaveData
@@ -37,3 +38,6 @@ public sealed class SaveSystem : MonoBehaviour
         return data;
     }
 }
+}
+
+

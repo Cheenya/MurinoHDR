@@ -6,7 +6,8 @@ using MurinoHDR.UI;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace MurinoHDR.Core;
+namespace MurinoHDR.Core
+{
 
 public sealed class GameBootstrapper : MonoBehaviour
 {
@@ -151,3 +152,6 @@ public sealed class GameBootstrapper : MonoBehaviour
         cameraObject.AddComponent<AudioListener>();
     }
 }
+}
+
+

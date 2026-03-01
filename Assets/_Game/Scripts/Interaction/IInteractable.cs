@@ -1,6 +1,7 @@
 using UnityEngine;
 
-namespace MurinoHDR.Interaction;
+namespace MurinoHDR.Interaction
+{
 
 public interface IInteractable
 {
@@ -8,3 +9,6 @@ public interface IInteractable
     bool CanInteract(GameObject interactor);
     void Interact(GameObject interactor);
 }
+}
+
+

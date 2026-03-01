@@ -1,6 +1,7 @@
 using UnityEngine;
 
-namespace MurinoHDR.Player;
+namespace MurinoHDR.Player
+{
 
 public sealed class PlayerLook : MonoBehaviour
 {
@@ -34,3 +35,6 @@ public sealed class PlayerLook : MonoBehaviour
         }
     }
 }
+}
+
+

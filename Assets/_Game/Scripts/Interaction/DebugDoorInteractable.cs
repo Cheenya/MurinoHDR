@@ -1,6 +1,7 @@
 using UnityEngine;
 
-namespace MurinoHDR.Interaction;
+namespace MurinoHDR.Interaction
+{
 
 public sealed class DebugDoorInteractable : InteractableBase
 {
@@ -14,3 +15,6 @@ public sealed class DebugDoorInteractable : InteractableBase
         Debug.Log("[INT] Door interaction triggered");
     }
 }
+}
+
+

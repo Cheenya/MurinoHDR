@@ -1,6 +1,7 @@
 using UnityEngine;
 
-namespace MurinoHDR.Interaction;
+namespace MurinoHDR.Interaction
+{
 
 public abstract class InteractableBase : MonoBehaviour, IInteractable
 {
@@ -18,3 +19,6 @@ public abstract class InteractableBase : MonoBehaviour, IInteractable
 
     public abstract void Interact(GameObject interactor);
 }
+}
+
+

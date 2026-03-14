@@ -13,6 +13,7 @@ public static class MvpSceneAuthoringTools
 {
     private const string GameScenePath = "Assets/_Game/Scenes/Game.unity";
     private const string EnvironmentRootName = "MVP_Environment";
+    private const string LayoutVersionName = "Layout_v2";
 
     static MvpSceneAuthoringTools()
     {
@@ -45,11 +46,13 @@ public static class MvpSceneAuthoringTools
         PlayerBuilder.RebuildPlayer();
 
         var promptUi = Object.FindFirstObjectByType<InteractionPromptUI>();
-        if (promptUi == null)
+        if (promptUi != null)
         {
-            var uiRoot = new GameObject("InteractionPromptUI");
-            uiRoot.AddComponent<InteractionPromptUI>();
+            Object.DestroyImmediate(promptUi.gameObject);
         }
+
+        var uiRoot = new GameObject("InteractionPromptUI");
+        uiRoot.AddComponent<InteractionPromptUI>();
 
         Selection.activeGameObject = GameObject.Find("MVP_Environment");
     }
@@ -66,7 +69,7 @@ public static class MvpSceneAuthoringTools
             return;
         }
 
-        if (GameObject.Find(EnvironmentRootName) == null)
+        if (NeedsEnvironmentRebuild())
         {
             BuildMvpContent();
             EditorSceneManager.MarkSceneDirty(scene);
@@ -88,13 +91,24 @@ public static class MvpSceneAuthoringTools
             return;
         }
 
-        if (GameObject.Find(EnvironmentRootName) == null)
+        if (NeedsEnvironmentRebuild())
         {
             BuildMvpContent();
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             Debug.Log("[GEN] Auto-built MVP content for active Game scene");
         }
+    }
+
+    private static bool NeedsEnvironmentRebuild()
+    {
+        var root = GameObject.Find(EnvironmentRootName);
+        if (root == null)
+        {
+            return true;
+        }
+
+        return root.transform.Find(LayoutVersionName) == null;
     }
 }
 }

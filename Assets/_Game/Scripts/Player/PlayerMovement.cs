@@ -11,39 +11,124 @@ public sealed class PlayerMovement : MonoBehaviour
 {
     [SerializeField] private float _walkSpeed = 4.5f;
     [SerializeField] private float _sprintMultiplier = 1.6f;
-    [SerializeField] private float _gravity = -18f;
+    [SerializeField] private float _crouchMultiplier = 0.55f;
+    [SerializeField] private float _jumpHeight = 1.15f;
+    [SerializeField] private float _gravity = -22f;
+    [SerializeField] private float _standingHeight = 1.8f;
+    [SerializeField] private float _crouchHeight = 1.05f;
+    [SerializeField] private float _heightLerpSpeed = 12f;
+    [SerializeField] private float _standingCameraHeight = 0.72f;
+    [SerializeField] private float _crouchCameraHeight = 0.3f;
 
     private CharacterController _characterController;
+    private Transform _cameraTransform;
+    private Vector3 _cameraLocalPosition;
     private float _verticalVelocity;
+    private bool _isCrouching;
+
+    public bool IsGrounded => _characterController != null && _characterController.isGrounded;
+    public bool IsCrouching => _isCrouching;
+    public float CurrentHorizontalSpeed { get; private set; }
 
     private void Awake()
     {
         _characterController = GetComponent<CharacterController>();
+        _characterController.height = _standingHeight;
+        _characterController.center = new Vector3(0f, _standingHeight * 0.5f, 0f);
+    }
+
+    private void Start()
+    {
+        var playerCamera = GetComponentInChildren<Camera>();
+        if (playerCamera != null)
+        {
+            _cameraTransform = playerCamera.transform;
+            _cameraLocalPosition = _cameraTransform.localPosition;
+        }
     }
 
     private void Update()
+    {
+        UpdateStance();
+        UpdateMovement();
+        UpdateCameraHeight();
+    }
+
+    private void UpdateStance()
+    {
+        var wantsCrouch = PlayerInputAdapter.IsCrouchHeld();
+        _isCrouching = wantsCrouch || (_isCrouching && !CanStandUp());
+
+        var targetHeight = _isCrouching ? _crouchHeight : _standingHeight;
+        _characterController.height = Mathf.Lerp(_characterController.height, targetHeight, Time.deltaTime * _heightLerpSpeed);
+        _characterController.height = Mathf.Clamp(_characterController.height, _crouchHeight, _standingHeight);
+        _characterController.center = new Vector3(0f, _characterController.height * 0.5f, 0f);
+    }
+
+    private void UpdateMovement()
     {
         var move2D = PlayerInputAdapter.ReadMove();
         var moveInput = new Vector3(move2D.x, 0f, move2D.y);
         moveInput = Vector3.ClampMagnitude(moveInput, 1f);
 
         var speed = _walkSpeed;
-        if (PlayerInputAdapter.IsSprintHeld())
+        if (_isCrouching)
+        {
+            speed *= _crouchMultiplier;
+        }
+        else if (PlayerInputAdapter.IsSprintHeld())
         {
             speed *= _sprintMultiplier;
         }
 
         var movement = transform.TransformDirection(moveInput) * speed;
 
-        if (_characterController.isGrounded && _verticalVelocity < 0f)
+        if (IsGrounded && _verticalVelocity < 0f)
         {
             _verticalVelocity = -2f;
+        }
+
+        if (IsGrounded && !_isCrouching && PlayerInputAdapter.WasJumpPressed())
+        {
+            _verticalVelocity = Mathf.Sqrt(_jumpHeight * -2f * _gravity);
         }
 
         _verticalVelocity += _gravity * Time.deltaTime;
         movement.y = _verticalVelocity;
 
         _characterController.Move(movement * Time.deltaTime);
+        CurrentHorizontalSpeed = new Vector3(_characterController.velocity.x, 0f, _characterController.velocity.z).magnitude;
+    }
+
+    private void UpdateCameraHeight()
+    {
+        if (_cameraTransform == null)
+        {
+            return;
+        }
+
+        var targetY = _isCrouching ? _crouchCameraHeight : _standingCameraHeight;
+        var localPosition = _cameraTransform.localPosition;
+        localPosition.y = Mathf.Lerp(localPosition.y, targetY, Time.deltaTime * _heightLerpSpeed);
+        _cameraTransform.localPosition = localPosition;
+        _cameraLocalPosition = localPosition;
+    }
+
+    private bool CanStandUp()
+    {
+        var radius = Mathf.Max(0.05f, _characterController.radius * 0.95f);
+        var bottom = transform.position + Vector3.up * radius;
+        var top = transform.position + Vector3.up * (_standingHeight - radius);
+        var colliders = Physics.OverlapCapsule(bottom, top, radius, ~0, QueryTriggerInteraction.Ignore);
+        for (var i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i].transform.root != transform)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 
@@ -73,7 +158,7 @@ internal static class PlayerInputAdapter
             return Mouse.current.delta.ReadValue();
         }
 #endif
-        return new Vector2(Input.GetAxis("Mouse X") * 12f, Input.GetAxis("Mouse Y") * 12f);
+        return new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y"));
     }
 
     public static bool IsSprintHeld()
@@ -85,6 +170,28 @@ internal static class PlayerInputAdapter
         }
 #endif
         return Input.GetKey(KeyCode.LeftShift);
+    }
+
+    public static bool IsCrouchHeld()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+        {
+            return Keyboard.current.leftCtrlKey.isPressed || Keyboard.current.cKey.isPressed;
+        }
+#endif
+        return Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C);
+    }
+
+    public static bool WasJumpPressed()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+        {
+            return Keyboard.current.spaceKey.wasPressedThisFrame;
+        }
+#endif
+        return Input.GetKeyDown(KeyCode.Space);
     }
 
     public static bool WasInteractPressed()
@@ -99,5 +206,3 @@ internal static class PlayerInputAdapter
     }
 }
 }
-
-

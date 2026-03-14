@@ -33,12 +33,14 @@ public static class PlayerBuilder
     {
         var player = new GameObject(PlayerName);
         player.tag = "Player";
-        player.transform.position = new Vector3(0f, 1.1f, 0f);
+        player.transform.position = new Vector3(0f, 1.15f, -11f);
 
         var controller = player.AddComponent<CharacterController>();
         controller.height = 1.8f;
         controller.radius = 0.35f;
         controller.center = new Vector3(0f, 0.9f, 0f);
+        controller.stepOffset = 0.3f;
+        controller.slopeLimit = 45f;
 
         player.AddComponent<PlayerMovement>();
         player.AddComponent<PlayerLook>();
@@ -67,7 +69,9 @@ public static class PlayerBuilder
         cameraObject.transform.SetParent(player.transform, false);
         cameraObject.transform.localPosition = new Vector3(0f, 0.72f, 0f);
 
-        cameraObject.AddComponent<Camera>();
+        var playerCamera = cameraObject.AddComponent<Camera>();
+        playerCamera.nearClipPlane = 0.03f;
+        playerCamera.fieldOfView = 78f;
         cameraObject.AddComponent<AudioListener>();
 
         return player;

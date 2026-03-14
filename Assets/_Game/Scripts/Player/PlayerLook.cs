@@ -27,14 +27,14 @@ public sealed class PlayerLook : MonoBehaviour
             return;
         }
 
-        if (Input.GetKeyDown(KeyCode.Escape))
+        if (PlayerInputAdapter.WasCursorReleasePressed())
         {
             ApplyCursorLock(false);
         }
 
         if (!_cursorLocked)
         {
-            if (Input.GetMouseButtonDown(0))
+            if (PlayerInputAdapter.WasLookCapturePressed())
             {
                 ApplyCursorLock(true);
             }

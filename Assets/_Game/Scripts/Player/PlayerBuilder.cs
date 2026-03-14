@@ -12,6 +12,7 @@ public static class PlayerBuilder
         var existing = GameObject.Find(PlayerName);
         if (existing != null)
         {
+            EnsureSingleGameplayCamera(existing);
             return existing;
         }
 
@@ -72,9 +73,53 @@ public static class PlayerBuilder
         var playerCamera = cameraObject.AddComponent<Camera>();
         playerCamera.nearClipPlane = 0.03f;
         playerCamera.fieldOfView = 78f;
-        cameraObject.AddComponent<AudioListener>();
+        var audioListener = cameraObject.AddComponent<AudioListener>();
+        EnsureSingleGameplayCamera(player, playerCamera, audioListener);
 
         return player;
+    }
+
+    private static void EnsureSingleGameplayCamera(GameObject playerRoot)
+    {
+        var playerCamera = playerRoot.GetComponentInChildren<Camera>();
+        var audioListener = playerRoot.GetComponentInChildren<AudioListener>();
+        EnsureSingleGameplayCamera(playerRoot, playerCamera, audioListener);
+    }
+
+    private static void EnsureSingleGameplayCamera(GameObject playerRoot, Camera playerCamera, AudioListener playerAudioListener)
+    {
+        var cameras = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
+        for (var i = 0; i < cameras.Length; i++)
+        {
+            var camera = cameras[i];
+            if (camera == null || camera == playerCamera)
+            {
+                continue;
+            }
+
+            if (camera.transform.root == playerRoot.transform)
+            {
+                continue;
+            }
+
+            camera.enabled = false;
+            if (camera.CompareTag("MainCamera"))
+            {
+                camera.tag = "Untagged";
+            }
+        }
+
+        var listeners = Object.FindObjectsByType<AudioListener>(FindObjectsSortMode.None);
+        for (var i = 0; i < listeners.Length; i++)
+        {
+            var listener = listeners[i];
+            if (listener == null)
+            {
+                continue;
+            }
+
+            listener.enabled = listener == playerAudioListener;
+        }
     }
 }
 }

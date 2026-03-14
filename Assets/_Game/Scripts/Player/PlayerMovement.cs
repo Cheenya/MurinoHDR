@@ -147,7 +147,11 @@ internal static class PlayerInputAdapter
             return Vector2.ClampMagnitude(move, 1f);
         }
 #endif
+#if ENABLE_LEGACY_INPUT_MANAGER
         return new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+#else
+        return Vector2.zero;
+#endif
     }
 
     public static Vector2 ReadLook()
@@ -158,7 +162,11 @@ internal static class PlayerInputAdapter
             return Mouse.current.delta.ReadValue();
         }
 #endif
+#if ENABLE_LEGACY_INPUT_MANAGER
         return new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y"));
+#else
+        return Vector2.zero;
+#endif
     }
 
     public static bool IsSprintHeld()
@@ -169,7 +177,11 @@ internal static class PlayerInputAdapter
             return Keyboard.current.leftShiftKey.isPressed;
         }
 #endif
+#if ENABLE_LEGACY_INPUT_MANAGER
         return Input.GetKey(KeyCode.LeftShift);
+#else
+        return false;
+#endif
     }
 
     public static bool IsCrouchHeld()
@@ -180,7 +192,11 @@ internal static class PlayerInputAdapter
             return Keyboard.current.leftCtrlKey.isPressed || Keyboard.current.cKey.isPressed;
         }
 #endif
+#if ENABLE_LEGACY_INPUT_MANAGER
         return Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C);
+#else
+        return false;
+#endif
     }
 
     public static bool WasJumpPressed()
@@ -191,7 +207,11 @@ internal static class PlayerInputAdapter
             return Keyboard.current.spaceKey.wasPressedThisFrame;
         }
 #endif
+#if ENABLE_LEGACY_INPUT_MANAGER
         return Input.GetKeyDown(KeyCode.Space);
+#else
+        return false;
+#endif
     }
 
     public static bool WasInteractPressed()
@@ -202,7 +222,41 @@ internal static class PlayerInputAdapter
             return Keyboard.current.eKey.wasPressedThisFrame;
         }
 #endif
+#if ENABLE_LEGACY_INPUT_MANAGER
         return Input.GetKeyDown(KeyCode.E);
+#else
+        return false;
+#endif
+    }
+
+    public static bool WasCursorReleasePressed()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+        {
+            return Keyboard.current.escapeKey.wasPressedThisFrame;
+        }
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        return Input.GetKeyDown(KeyCode.Escape);
+#else
+        return false;
+#endif
+    }
+
+    public static bool WasLookCapturePressed()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Mouse.current != null)
+        {
+            return Mouse.current.leftButton.wasPressedThisFrame;
+        }
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        return Input.GetMouseButtonDown(0);
+#else
+        return false;
+#endif
     }
 }
 }

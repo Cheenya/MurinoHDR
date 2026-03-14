@@ -94,10 +94,7 @@ public sealed class GameBootstrapper : MonoBehaviour
 
     private static void EnsureGameSceneSetup()
     {
-        if (FindFirstObjectByType<PlayerMovement>() == null)
-        {
-            PlayerBuilder.EnsurePlayer();
-        }
+        PlayerBuilder.EnsurePlayer();
 
         if (FindFirstObjectByType<InteractionPromptUI>() == null)
         {

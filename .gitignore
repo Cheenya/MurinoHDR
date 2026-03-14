@@ -9,6 +9,7 @@
 [Bb]uilds/
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
+ProjectSettings/SceneTemplateSettings.json
 
 # MemoryCaptures can get excessive in size.
 [Mm]emoryCaptures/
@@ -24,6 +25,7 @@
 
 # Visual Studio cache directory
 .vs/
+.vscode/
 
 # Gradle cache directory
 .gradle/
@@ -62,3 +64,48 @@ sysinfo.txt
 *.exe
 *.ipa
 *.xcodeproj
+
+# Curated ThirdParty asset subset for Murino MVP.
+Assets/ThirdParty/Kenney/**
+!Assets/ThirdParty/Kenney.meta
+!Assets/ThirdParty/Kenney/
+!Assets/ThirdParty/Kenney/BuildingKit.meta
+!Assets/ThirdParty/Kenney/BuildingKit/
+!Assets/ThirdParty/Kenney/BuildingKit/License.txt
+!Assets/ThirdParty/Kenney/BuildingKit/License.txt.meta
+!Assets/ThirdParty/Kenney/BuildingKit/Models.meta
+!Assets/ThirdParty/Kenney/BuildingKit/Models/
+!Assets/ThirdParty/Kenney/BuildingKit/Models/FBX format.meta
+!Assets/ThirdParty/Kenney/BuildingKit/Models/FBX format/
+!Assets/ThirdParty/Kenney/BuildingKit/Models/FBX format/door-rotate-square-a.fbx
+!Assets/ThirdParty/Kenney/BuildingKit/Models/FBX format/door-rotate-square-a.fbx.meta
+!Assets/ThirdParty/Kenney/FurnitureKit.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/
+!Assets/ThirdParty/Kenney/FurnitureKit/License.txt
+!Assets/ThirdParty/Kenney/FurnitureKit/License.txt.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/Models.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/bench.fbx
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/bench.fbx.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/cardboardBoxClosed.fbx
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/cardboardBoxClosed.fbx.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/cardboardBoxOpen.fbx
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/cardboardBoxOpen.fbx.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/chairDesk.fbx
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/chairDesk.fbx.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/desk.fbx
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/desk.fbx.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/floorFull.fbx
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/floorFull.fbx.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/stairsOpen.fbx
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/stairsOpen.fbx.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/televisionModern.fbx
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/televisionModern.fbx.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/trashcan.fbx
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/trashcan.fbx.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/wall.fbx
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/wall.fbx.meta
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/wallDoorwayWide.fbx
+!Assets/ThirdParty/Kenney/FurnitureKit/Models/FBX format/wallDoorwayWide.fbx.meta

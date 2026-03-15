@@ -6,7 +6,7 @@ namespace MurinoHDR.Generation
 
 public static class DoorValidator
 {
-    public static List<ValidationError> ValidateDoors(GridMap2D grid, bool[] walkable, int[] zoneId, IList<DoorInstance> doors)
+    public static List<ValidationError> ValidateDoors(GridMap2D grid, bool[] walkable, int[] zoneId, IList<DoorInstance> doors, IList<PropInstance> props)
     {
         var errors = new List<ValidationError>();
         if (grid == null || doors == null)
@@ -34,16 +34,20 @@ public static class DoorValidator
             var sideIssues = 0;
             if (!IsWalkable(grid, walkable, leftCell) || !IsWalkable(grid, walkable, rightCell))
             {
+                var blockingPropId = FindBlockingPropId(door, props);
                 errors.Add(new ValidationError
                 {
-                    Code = ValidationErrorCode.DoorSideNotWalkable,
+                    Code = blockingPropId >= 0 ? ValidationErrorCode.DoorSealedByObstacle : ValidationErrorCode.DoorSideNotWalkable,
                     Severity = ValidationSeverity.Error,
-                    Message = string.Format("Door {0} имеет непроходимую сторону", door.DebugName),
+                    Message = blockingPropId >= 0
+                        ? string.Format("Door {0} запечатана пропом рядом с карманом двери", door.DebugName)
+                        : string.Format("Door {0} имеет непроходимую сторону", door.DebugName),
                     Cell = centerCell,
                     WorldPos = door.WorldPos,
                     DoorId = door.DoorId,
                     RoomId = door.RoomAId,
-                    SuggestedFix = SuggestedFix.OpenOrWidenDoor,
+                    PropId = blockingPropId,
+                    SuggestedFix = blockingPropId >= 0 ? SuggestedFix.NudgeBlockingProp : SuggestedFix.OpenOrWidenDoor,
                 });
                 sideIssues++;
             }
@@ -116,6 +120,34 @@ public static class DoorValidator
         }
 
         return result;
+    }
+
+    private static int FindBlockingPropId(DoorInstance door, IList<PropInstance> props)
+    {
+        if (props == null)
+        {
+            return -1;
+        }
+
+        var expanded = door.Orientation == DoorOrientation.Horizontal
+            ? Rect.MinMaxRect(door.WorldRectXZ.xMin - 0.35f, door.WorldRectXZ.yMin - 1.2f, door.WorldRectXZ.xMax + 0.35f, door.WorldRectXZ.yMax + 1.2f)
+            : Rect.MinMaxRect(door.WorldRectXZ.xMin - 1.2f, door.WorldRectXZ.yMin - 0.35f, door.WorldRectXZ.xMax + 1.2f, door.WorldRectXZ.yMax + 0.35f);
+
+        for (var i = 0; i < props.Count; i++)
+        {
+            if (!props[i].BlocksMovement)
+            {
+                continue;
+            }
+
+            var propRect = Rect.MinMaxRect(props[i].WorldBounds.min.x, props[i].WorldBounds.min.z, props[i].WorldBounds.max.x, props[i].WorldBounds.max.z);
+            if (expanded.Overlaps(propRect))
+            {
+                return props[i].PropId;
+            }
+        }
+
+        return -1;
     }
 }
 }

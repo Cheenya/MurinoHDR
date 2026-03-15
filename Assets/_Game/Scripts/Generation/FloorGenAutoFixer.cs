@@ -28,7 +28,7 @@ public static class FloorGenAutoFixer
                     break;
                 case SuggestedFix.RemoveBlockingProp:
                 case SuggestedFix.NudgeBlockingProp:
-                    changed |= TryDisableProp(result, error);
+                    changed |= TryFixBlockingProp(result, report, error);
                     break;
             }
 
@@ -52,6 +52,11 @@ public static class FloorGenAutoFixer
             }
 
             var cell = FindNearestReachableCellInRoom(report.Grid, report.Reachable, error.RoomId, pickup.WorldPos);
+            if (cell.x < 0)
+            {
+                cell = FindNearestReachableDoorCorridorCell(result, report.Grid, report.Reachable, error.RoomId);
+            }
+
             if (cell.x < 0)
             {
                 continue;
@@ -97,6 +102,44 @@ public static class FloorGenAutoFixer
         return bestCell;
     }
 
+    private static Vector2Int FindNearestReachableDoorCorridorCell(FloorResult result, GridMap2D grid, bool[] reachable, int roomId)
+    {
+        var bestCell = new Vector2Int(-1, -1);
+        var bestDistance = float.MaxValue;
+        for (var i = 0; i < result.Doors.Count; i++)
+        {
+            var door = result.Doors[i];
+            if (door.RoomAId != roomId && door.RoomBId != roomId)
+            {
+                continue;
+            }
+
+            var center = grid.WorldToCell(door.WorldPos);
+            var candidates = door.Orientation == DoorOrientation.Horizontal
+                ? new[] { center + Vector2Int.up, center + Vector2Int.down }
+                : new[] { center + Vector2Int.left, center + Vector2Int.right };
+            for (var c = 0; c < candidates.Length; c++)
+            {
+                var cell = candidates[c];
+                if (!grid.InBounds(cell) || !reachable[grid.Index(cell.x, cell.y)])
+                {
+                    continue;
+                }
+
+                var distance = Vector2Int.Distance(center, cell);
+                if (distance >= bestDistance)
+                {
+                    continue;
+                }
+
+                bestDistance = distance;
+                bestCell = cell;
+            }
+        }
+
+        return bestCell;
+    }
+
     private static bool TryFixDoor(FloorResult result, ValidationConfig config, ValidationError error)
     {
         for (var i = 0; i < result.Doors.Count; i++)
@@ -122,7 +165,7 @@ public static class FloorGenAutoFixer
         return false;
     }
 
-    private static bool TryDisableProp(FloorResult result, ValidationError error)
+    private static bool TryFixBlockingProp(FloorResult result, ValidationReport report, ValidationError error)
     {
         for (var i = 0; i < result.Props.Count; i++)
         {
@@ -131,11 +174,98 @@ public static class FloorGenAutoFixer
                 continue;
             }
 
+            if (TryNudgeProp(result, report, result.Props[i], error))
+            {
+                return true;
+            }
+
             result.Props[i].BlocksMovement = false;
+            result.Props[i].SealsDoorZone = false;
             return true;
         }
 
         return false;
+    }
+
+    private static bool TryNudgeProp(FloorResult result, ValidationReport report, PropInstance prop, ValidationError error)
+    {
+        if (report.Grid == null)
+        {
+            return false;
+        }
+
+        var step = report.Grid.CellSize;
+        var seed = StableHash(report.Seed, report.AttemptIndex, prop.PropId);
+        var directions = new[]
+        {
+            Vector3.right,
+            Vector3.left,
+            Vector3.forward,
+            Vector3.back,
+        };
+
+        for (var distance = 1; distance <= 2; distance++)
+        {
+            for (var i = 0; i < directions.Length; i++)
+            {
+                var direction = directions[(seed + i) % directions.Length];
+                var offset = direction * (step * distance);
+                var moved = new Bounds(prop.WorldBounds.center + offset, prop.WorldBounds.size);
+                if (!FitsInRoom(result, prop.RoomId, moved) || OverlapsBlockingProp(result, prop.PropId, moved))
+                {
+                    continue;
+                }
+
+                prop.WorldBounds = moved;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool FitsInRoom(FloorResult result, int roomId, Bounds bounds)
+    {
+        var room = result.GetRoom(roomId);
+        if (room == null)
+        {
+            return false;
+        }
+
+        return room.WorldBounds.Contains(new Vector3(bounds.min.x, room.WorldBounds.center.y, bounds.min.z))
+            && room.WorldBounds.Contains(new Vector3(bounds.max.x, room.WorldBounds.center.y, bounds.max.z));
+    }
+
+    private static bool OverlapsBlockingProp(FloorResult result, int ignoredPropId, Bounds bounds)
+    {
+        var rect = Rect.MinMaxRect(bounds.min.x, bounds.min.z, bounds.max.x, bounds.max.z);
+        for (var i = 0; i < result.Props.Count; i++)
+        {
+            var prop = result.Props[i];
+            if (!prop.BlocksMovement || prop.PropId == ignoredPropId)
+            {
+                continue;
+            }
+
+            var other = Rect.MinMaxRect(prop.WorldBounds.min.x, prop.WorldBounds.min.z, prop.WorldBounds.max.x, prop.WorldBounds.max.z);
+            if (rect.Overlaps(other))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static int StableHash(int a, int b, int c)
+    {
+        unchecked
+        {
+            var value = a;
+            value = (value * 397) ^ b;
+            value = (value * 397) ^ c;
+            return Mathf.Abs(value);
+        }
     }
 }
 }

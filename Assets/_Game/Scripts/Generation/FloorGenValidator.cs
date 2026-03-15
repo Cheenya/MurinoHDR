@@ -62,7 +62,7 @@ public static class FloorGenValidator
         report.ZoneId = zoneId;
 
         Append(report, ReachabilityValidator.ValidateReachability(grid, reachable, distances, result, config));
-        Append(report, DoorValidator.ValidateDoors(grid, walkable, zoneId, result.Doors));
+        Append(report, DoorValidator.ValidateDoors(grid, walkable, zoneId, result.Doors, result.Props));
         Append(report, CorridorWidthValidator.ValidateMinWidth(grid, walkable, config.MainCorridorMinWidthCells, config.SecondaryCorridorMinWidthCells, config.CorridorSampleStride, config.AllowSingleCellTechChokepoints));
 
         ValidateDoorWidths(result, config, report);

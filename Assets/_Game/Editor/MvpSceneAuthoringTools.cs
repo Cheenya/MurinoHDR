@@ -43,6 +43,28 @@ public static class MvpSceneAuthoringTools
         Debug.Log("[GEN] MVP content was built in active scene");
     }
 
+    [MenuItem("Tools/Murino/Spawn Props Only")]
+    public static void SpawnPropsOnly()
+    {
+        var existingInfo = Object.FindFirstObjectByType<GeneratedFloorInfo>();
+        var seed = existingInfo != null ? existingInfo.Seed : 1000;
+        CleanLegacySceneObjects();
+        MvpEnvironmentBuilder.RebuildEnvironment(seed);
+        PlayerBuilder.RebuildPlayer();
+
+        var promptUi = Object.FindFirstObjectByType<InteractionPromptUI>();
+        if (promptUi == null)
+        {
+            var uiRoot = new GameObject("InteractionPromptUI");
+            uiRoot.AddComponent<InteractionPromptUI>();
+        }
+
+        var scene = EditorSceneManager.GetActiveScene();
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log(string.Format("[GEN] Props were regenerated for seed {0}", seed));
+    }
+
     [MenuItem("Tools/Murino/Validate Floor Generation")]
     public static void ValidateFloorGeneration()
     {

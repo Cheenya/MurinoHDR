@@ -74,6 +74,20 @@ public static class MvpRuntimeContent
 
         var validationConfig = new ValidationConfig();
         var outsideTheme = CreateRuntimeAsset<OutsideThemeProfile>("DefaultOutsideTheme");
+        var officeRules = CreateRuntimeAsset<OfficeGenerationRules>("DefaultOfficeRules");
+        officeRules.Configure(
+            FloorStyle.CabinetHeavy,
+            System.Array.Empty<FloorStyleProfile>(),
+            System.Array.Empty<RoomPlacementRule>(),
+            System.Array.Empty<AdjacencyRule>(),
+            new[] { outsideTheme },
+            2,
+            1,
+            1,
+            1,
+            5,
+            10f,
+            20f);
         var settings = CreateRuntimeAsset<FloorGeneratorSettings>("DefaultFloorSettings");
         settings.Configure(4f, 0.24f, 3.25f, 0.28f, 2, 4, 24, new[]
         {
@@ -86,7 +100,7 @@ public static class MvpRuntimeContent
             elevatorTemplate,
             shaftTemplate,
             stairsTemplate,
-        }, validationConfig, outsideTheme);
+        }, validationConfig, outsideTheme, officeRules);
 
         var items = new[] { keycard, fuse, tape, repairedFuse, crowbar, rope, lockpick };
         var recipes = new[] { repairFuseRecipe };

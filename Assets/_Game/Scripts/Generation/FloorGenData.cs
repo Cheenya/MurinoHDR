@@ -18,6 +18,16 @@ public enum RoomTags
     MainPath = 1 << 6,
     SecondaryPath = 1 << 7,
     Tech = 1 << 8,
+    Landmark = 1 << 9,
+    FacadePreferred = 1 << 10,
+    CorePreferred = 1 << 11,
+    FacadeRequired = 1 << 12,
+    RequiresWindow = 1 << 13,
+    Support = 1 << 14,
+    LootSource = 1 << 15,
+    SafeSpotCandidate = 1 << 16,
+    ChokepointsAllowed = 1 << 17,
+    Corridor = 1 << 18,
 }
 
 [Flags]
@@ -51,6 +61,7 @@ public enum GridCellTags
     Tech = 1 << 5,
     Door = 1 << 6,
     Window = 1 << 7,
+    ChokepointAllowed = 1 << 8,
 }
 
 public enum ExitType
@@ -83,6 +94,94 @@ public enum SupportType
     Checkpoint = 6,
 }
 
+public enum RoomType
+{
+    StartCheckpoint = 0,
+    ElevatorLobby = 1,
+    StairsLobby = 2,
+    ShaftAccess = 3,
+    MainCorridor = 4,
+    OpenSpace = 5,
+    CabinetsCluster = 6,
+    MeetingRoom = 7,
+    KitchenBreak = 8,
+    BreakRoom = 9,
+    Reception = 10,
+    SecurityRoom = 11,
+    ElectricalRoom = 12,
+    ElectricalSubstation = 13,
+    StorageRoom = 14,
+    JanitorCloset = 15,
+    Warehouse = 16,
+    LoadingMini = 17,
+    ServerRoom = 18,
+    HVACRoom = 19,
+    TechCorridor = 20,
+    VentSegment = 21,
+    PrintCopyRoom = 22,
+    ArchiveRoom = 23,
+    ManagerOffice = 24,
+    TrainingRoom = 25,
+    Restroom = 26,
+}
+
+public enum PropCategory
+{
+    Desk = 0,
+    Chair = 1,
+    Monitor = 2,
+    KeyboardMouse = 3,
+    DeskDivider = 4,
+    Cabinet = 5,
+    Shelf = 6,
+    ArchiveBox = 7,
+    DocumentStack = 8,
+    PlantSmall = 9,
+    PlantLarge = 10,
+    KitchenCounter = 11,
+    Microwave = 12,
+    CoffeeMachine = 13,
+    Fridge = 14,
+    Sink = 15,
+    VendingMachine = 16,
+    TableSmall = 17,
+    TableLarge = 18,
+    Sofa = 19,
+    Armchair = 20,
+    PrinterCopier = 21,
+    Whiteboard = 22,
+    Projector = 23,
+    TV = 24,
+    ServerRack = 25,
+    UPS = 26,
+    ACUnit = 27,
+    CableTray = 28,
+    NetworkCabinet = 29,
+    ElectricalPanel = 30,
+    WarningSign = 31,
+    Toolbox = 32,
+    Rack = 33,
+    Pallet = 34,
+    Box = 35,
+    Container = 36,
+    HandTruck = 37,
+    Pipe = 38,
+    VentGrate = 39,
+    Duct = 40,
+    MaintenanceSign = 41,
+    Ladder = 42,
+    Hatch = 43,
+    TrashBin = 44,
+    WaterCooler = 45,
+    CoatRack = 46,
+    ReceptionDesk = 47,
+    Turnstile = 48,
+    EvacPlan = 49,
+    DecalPostIt = 50,
+    DecalPaper = 51,
+    DecalArrow = 52,
+}
+
 public enum DoorOrientation
 {
     Horizontal = 0,
@@ -95,8 +194,18 @@ public sealed class RoomInstance
     public int RoomId;
     public string Name = string.Empty;
     public RoomCategory RoomType;
+    public RoomType DetailedType;
+    public FloorStyle Style;
     public RoomTags Tags;
     public Bounds WorldBounds;
+    public RoomSide FacadeSide;
+    public Rect WalkSpineRectXZ;
+    public string PropPatternId = string.Empty;
+    public string LightingProfileId = string.Empty;
+    public string DecorProfileId = string.Empty;
+    public string Signature = string.Empty;
+    public bool RequiresFacadeWindow;
+    public bool HasWindow;
     public readonly List<int> DoorIds = new List<int>();
 }
 
@@ -131,8 +240,13 @@ public sealed class PropInstance
 {
     public int PropId;
     public string DebugName = string.Empty;
+    public PropCategory Category;
+    public string PatternId = string.Empty;
+    public string PrefabName = string.Empty;
     public Bounds WorldBounds;
+    public Quaternion Rotation = Quaternion.identity;
     public bool BlocksMovement;
+    public bool SealsDoorZone;
     public int RoomId = -1;
 }
 
@@ -221,6 +335,7 @@ public sealed class FloorResult
 {
     public int Seed;
     public int AttemptIndex;
+    public FloorStyle Style;
     public Bounds FootprintWorld;
     public OutsideThemeProfile OutsideTheme;
     public readonly List<RoomInstance> Rooms = new List<RoomInstance>();

@@ -62,6 +62,11 @@ public static class MvpEnvironmentBuilder
 
     public static GameObject EnsureEnvironment()
     {
+        return EnsureEnvironment(null);
+    }
+
+    public static GameObject EnsureEnvironment(int? forcedSeed)
+    {
         var existingRoot = GameObject.Find(RootName);
         if (existingRoot != null && existingRoot.transform.Find(LayoutVersionName) != null)
         {
@@ -73,10 +78,15 @@ public static class MvpEnvironmentBuilder
             UnityEngine.Object.DestroyImmediate(existingRoot);
         }
 
-        return BuildEnvironment();
+        return BuildEnvironment(forcedSeed);
     }
 
     public static GameObject RebuildEnvironment()
+    {
+        return RebuildEnvironment(null);
+    }
+
+    public static GameObject RebuildEnvironment(int? forcedSeed)
     {
         var existingRoot = GameObject.Find(RootName);
         if (existingRoot != null)
@@ -84,15 +94,15 @@ public static class MvpEnvironmentBuilder
             UnityEngine.Object.DestroyImmediate(existingRoot);
         }
 
-        return BuildEnvironment();
+        return BuildEnvironment(forcedSeed);
     }
 
-    private static GameObject BuildEnvironment()
+    private static GameObject BuildEnvironment(int? forcedSeed)
     {
         MvpRuntimeContent.EnsureInitialized();
 
         var settings = MvpRuntimeContent.Catalog.GeneratorSettings;
-        var seed = Mathf.Abs(Environment.TickCount);
+        var seed = forcedSeed ?? Mathf.Abs(Environment.TickCount);
         var result = FloorGenerator.Generate(seed, settings);
         var report = FloorGenerator.Validate(result, settings);
 
@@ -116,7 +126,8 @@ public static class MvpEnvironmentBuilder
         BuildBoundaries(result, settings, roomLookup);
         BuildExitSetpieces(roomLookup, result, settings, goals);
         CreateRoomAnchors(result, settings, roomLookup);
-        SpawnPickups(result, settings, roomLookup);
+        SpawnPickups(result.FloorData, roomLookup);
+        SpawnGeneratedProps(result.FloorData, roomLookup);
 
         if (!report.IsValid)
         {
@@ -408,44 +419,30 @@ public static class MvpEnvironmentBuilder
         CreateAnchor(roomRoot, "Anchor_StairsModel", new Vector3(center.x, 0f, center.z + 0.25f));
     }
 
-    private static void SpawnPickups(FloorGenerationResult result, FloorGeneratorSettings settings, Dictionary<string, Transform> roomLookup)
+    private static void SpawnPickups(FloorResult floorData, Dictionary<string, Transform> roomLookup)
     {
-        var spawnPlan = new List<Tuple<string, RoomCategory, Vector3>>
+        if (floorData == null)
         {
-            Tuple.Create("tape", RoomCategory.Start, new Vector3(0.9f, 0f, 0.85f)),
-            Tuple.Create("keycard", RoomCategory.Office, new Vector3(0.85f, 0f, 0.65f)),
-            Tuple.Create("fuse", RoomCategory.Utility, new Vector3(-0.8f, 0f, 0.55f)),
-            Tuple.Create("crowbar", RoomCategory.Storage, new Vector3(-0.7f, 0f, 0.7f)),
-            Tuple.Create("rope", RoomCategory.Utility, new Vector3(0.8f, 0f, -0.55f)),
-            Tuple.Create("lockpick", RoomCategory.Office, new Vector3(-0.85f, 0f, -0.55f)),
-        };
+            return;
+        }
 
-        for (var i = 0; i < spawnPlan.Count; i++)
+        for (var i = 0; i < floorData.Pickups.Count; i++)
         {
-            var room = FindPickupRoom(result, spawnPlan[i].Item2, i);
-            if (room == null || !roomLookup.ContainsKey(room.InstanceId))
+            var pickup = floorData.Pickups[i];
+            var room = floorData.GetRoom(pickup.RoomId);
+            if (room == null)
             {
                 continue;
             }
 
-            var roomRoot = roomLookup[room.InstanceId];
-            var worldPosition = GetRoomWorldCenter(room.Rect, settings, result.WorldOffset) + spawnPlan[i].Item3;
-            CreatePickup(roomRoot, MvpRuntimeContent.GetItem(spawnPlan[i].Item1), worldPosition);
-        }
-    }
-
-    private static GeneratedRoom FindPickupRoom(FloorGenerationResult result, RoomCategory preferredCategory, int index)
-    {
-        var matches = new List<GeneratedRoom>();
-        for (var i = 0; i < result.Rooms.Count; i++)
-        {
-            if (result.Rooms[i].Category == preferredCategory)
+            Transform roomRoot;
+            if (!roomLookup.TryGetValue(room.Name, out roomRoot))
             {
-                matches.Add(result.Rooms[i]);
+                continue;
             }
-        }
 
-        return matches.Count > 0 ? matches[index % matches.Count] : (result.Rooms.Count > 0 ? result.Rooms[0] : null);
+            CreatePickup(roomRoot, MvpRuntimeContent.GetItem(pickup.ItemId), pickup.WorldPos);
+        }
     }
 
     private static void CreatePickup(Transform parent, ItemDefinition item, Vector3 worldPosition)
@@ -466,6 +463,108 @@ public static class MvpEnvironmentBuilder
 
         var interactable = pickup.AddComponent<ItemPickupInteractable>();
         interactable.Configure(item, 1);
+    }
+
+    private static void SpawnGeneratedProps(FloorResult floorData, Dictionary<string, Transform> roomLookup)
+    {
+        if (floorData == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < floorData.Props.Count; i++)
+        {
+            var prop = floorData.Props[i];
+            var room = floorData.GetRoom(prop.RoomId);
+            if (room == null)
+            {
+                continue;
+            }
+
+            Transform roomRoot;
+            if (!roomLookup.TryGetValue(room.Name, out roomRoot))
+            {
+                continue;
+            }
+
+            CreatePropVisual(roomRoot, prop);
+        }
+    }
+
+    private static void CreatePropVisual(Transform parent, PropInstance prop)
+    {
+        var primitiveType = GetPrimitiveType(prop.Category);
+        var visual = GameObject.CreatePrimitive(primitiveType);
+        visual.name = string.Format("Prop_{0}_{1}", prop.Category, prop.PropId);
+        visual.transform.SetParent(parent, false);
+        visual.transform.position = prop.WorldBounds.center;
+        visual.transform.rotation = prop.Rotation;
+        visual.transform.localScale = prop.WorldBounds.size;
+
+        var renderer = visual.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.sharedMaterial = GetPropMaterial(prop.Category);
+        }
+
+        if (!prop.BlocksMovement)
+        {
+            var collider = visual.GetComponent<Collider>();
+            if (collider != null)
+            {
+                UnityEngine.Object.DestroyImmediate(collider);
+            }
+        }
+    }
+
+    private static PrimitiveType GetPrimitiveType(PropCategory category)
+    {
+        switch (category)
+        {
+            case PropCategory.PlantSmall:
+            case PropCategory.PlantLarge:
+            case PropCategory.TrashBin:
+            case PropCategory.WaterCooler:
+            case PropCategory.Pipe:
+                return PrimitiveType.Cylinder;
+            case PropCategory.Monitor:
+            case PropCategory.Microwave:
+            case PropCategory.CoffeeMachine:
+            case PropCategory.WarningSign:
+            case PropCategory.EvacPlan:
+            case PropCategory.DecalPaper:
+            case PropCategory.DecalPostIt:
+                return PrimitiveType.Quad;
+            default:
+                return PrimitiveType.Cube;
+        }
+    }
+
+    private static Material GetPropMaterial(PropCategory category)
+    {
+        switch (category)
+        {
+            case PropCategory.PlantSmall:
+            case PropCategory.PlantLarge:
+                return GetPalette().Accent;
+            case PropCategory.Pipe:
+            case PropCategory.Duct:
+            case PropCategory.CableTray:
+            case PropCategory.ServerRack:
+            case PropCategory.NetworkCabinet:
+            case PropCategory.ElectricalPanel:
+                return GetPalette().Metal;
+            case PropCategory.Box:
+            case PropCategory.Pallet:
+            case PropCategory.Rack:
+            case PropCategory.Container:
+            case PropCategory.TableSmall:
+            case PropCategory.TableLarge:
+            case PropCategory.ReceptionDesk:
+                return GetPalette().Wood;
+            default:
+                return GetPalette().Partition;
+        }
     }
 
     private static void CreateRoomAnchors(FloorGenerationResult result, FloorGeneratorSettings settings, Dictionary<string, Transform> roomLookup)

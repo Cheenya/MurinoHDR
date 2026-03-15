@@ -25,9 +25,10 @@ public sealed class PlayerInteractor : MonoBehaviour
         }
 
         var ray = new Ray(_camera.transform.position, _camera.transform.forward);
-        if (Physics.Raycast(ray, out var hit, _interactDistance, _mask) && hit.collider.TryGetComponent<IInteractable>(out var interactable))
+        if (Physics.Raycast(ray, out var hit, _interactDistance, _mask, QueryTriggerInteraction.Collide))
         {
-            if (interactable.CanInteract(gameObject))
+            var interactable = hit.collider.GetComponentInParent<IInteractable>();
+            if (interactable != null && interactable.CanInteract(gameObject))
             {
                 InteractionPromptUI.Instance?.Show($"Нажмите E: {interactable.GetPrompt(gameObject)}");
                 if (PlayerInputAdapter.WasInteractPressed())

@@ -1,4 +1,5 @@
 using UnityEngine;
+using MurinoHDR.UI;
 
 namespace MurinoHDR.Player
 {
@@ -34,6 +35,11 @@ public sealed class PlayerLook : MonoBehaviour
 
         if (!_cursorLocked)
         {
+            if (InteractionPromptUI.Instance != null && InteractionPromptUI.Instance.IsModalOpen)
+            {
+                return;
+            }
+
             if (PlayerInputAdapter.WasLookCapturePressed())
             {
                 ApplyCursorLock(true);

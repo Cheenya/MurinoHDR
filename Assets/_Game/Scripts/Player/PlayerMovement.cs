@@ -258,5 +258,20 @@ internal static class PlayerInputAdapter
         return false;
 #endif
     }
+
+    public static bool WasCraftTogglePressed()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+        {
+            return Keyboard.current.tabKey.wasPressedThisFrame || Keyboard.current.iKey.wasPressedThisFrame;
+        }
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        return Input.GetKeyDown(KeyCode.Tab) || Input.GetKeyDown(KeyCode.I);
+#else
+        return false;
+#endif
+    }
 }
 }

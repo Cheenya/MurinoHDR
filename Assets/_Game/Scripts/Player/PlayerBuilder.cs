@@ -1,4 +1,5 @@
 using UnityEngine;
+using MurinoHDR.Inventory;
 
 namespace MurinoHDR.Player
 {
@@ -46,6 +47,8 @@ public static class PlayerBuilder
         player.AddComponent<PlayerMovement>();
         player.AddComponent<PlayerLook>();
         player.AddComponent<PlayerInteractor>();
+        player.AddComponent<Inventory.Inventory>();
+        player.AddComponent<CraftingSystem>();
 
         var visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         visual.name = "BodyVisual";

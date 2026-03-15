@@ -94,15 +94,60 @@ public sealed class GameBootstrapper : MonoBehaviour
 
     private static void EnsureGameSceneSetup()
     {
-        PlayerBuilder.EnsurePlayer();
+        CleanupLegacySceneObjects();
+        var player = PlayerBuilder.EnsurePlayer();
+        var environment = MvpEnvironmentBuilder.EnsureEnvironment();
+        PlacePlayerAtSpawn(player, environment);
 
         if (FindFirstObjectByType<InteractionPromptUI>() == null)
         {
             var uiObject = new GameObject("InteractionPromptUI");
             uiObject.AddComponent<InteractionPromptUI>();
         }
+    }
 
-        MvpEnvironmentBuilder.EnsureEnvironment();
+    private static void CleanupLegacySceneObjects()
+    {
+        var legacyRoots = new[] { "Main Camera", "Sun", "Sky and Fog Volume" };
+        for (var i = 0; i < legacyRoots.Length; i++)
+        {
+            var root = GameObject.Find(legacyRoots[i]);
+            if (root != null)
+            {
+                Destroy(root);
+            }
+        }
+    }
+
+    private static void PlacePlayerAtSpawn(GameObject player, GameObject environment)
+    {
+        if (player == null || environment == null)
+        {
+            return;
+        }
+
+        var spawn = environment.transform.Find("Rooms/Reception/Spawn_PlayerStart");
+        if (spawn == null)
+        {
+            spawn = environment.transform.Find("Rooms/StartRoom/Spawn_PlayerStart");
+        }
+        if (spawn == null)
+        {
+            return;
+        }
+
+        var controller = player.GetComponent<CharacterController>();
+        if (controller != null)
+        {
+            controller.enabled = false;
+        }
+
+        player.transform.position = spawn.position;
+
+        if (controller != null)
+        {
+            controller.enabled = true;
+        }
     }
 }
 }

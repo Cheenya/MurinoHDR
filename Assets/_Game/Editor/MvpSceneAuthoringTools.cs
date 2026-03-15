@@ -1,3 +1,4 @@
+﻿using MurinoHDR.Core;
 using MurinoHDR.Generation;
 using MurinoHDR.Player;
 using MurinoHDR.UI;
@@ -41,8 +42,37 @@ public static class MvpSceneAuthoringTools
         Debug.Log("[GEN] MVP content was built in active scene");
     }
 
+    [MenuItem("Tools/Murino/Validate Floor Generation")]
+    public static void ValidateFloorGeneration()
+    {
+        MvpRuntimeContent.EnsureInitialized();
+        var settings = MvpRuntimeContent.Catalog.GeneratorSettings;
+        var failed = 0;
+        for (var i = 0; i < settings.ValidationRuns; i++)
+        {
+            var seed = 1000 + i;
+            var result = FloorGenerator.Generate(seed, settings);
+            var report = FloorGenerator.Validate(result, settings);
+            if (!report.IsValid)
+            {
+                failed++;
+                Debug.LogError(string.Format("[GEN] {0}", report.BuildSummary()));
+            }
+        }
+
+        if (failed == 0)
+        {
+            Debug.Log(string.Format("[GEN] Validation passed for {0} seeds", settings.ValidationRuns));
+        }
+        else
+        {
+            Debug.LogError(string.Format("[GEN] Validation failed for {0} seeds", failed));
+        }
+    }
+
     private static void BuildMvpContent()
     {
+        CleanLegacySceneObjects();
         MvpEnvironmentBuilder.RebuildEnvironment();
         PlayerBuilder.RebuildPlayer();
 
@@ -63,14 +93,22 @@ public static class MvpSceneAuthoringTools
         }
     }
 
+    private static void CleanLegacySceneObjects()
+    {
+        var legacyRoots = new[] { "Main Camera", "Sun", "Sky and Fog Volume" };
+        for (var i = 0; i < legacyRoots.Length; i++)
+        {
+            var root = GameObject.Find(legacyRoots[i]);
+            if (root != null)
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+    }
+
     private static void OnSceneOpened(UnityEngine.SceneManagement.Scene scene, OpenSceneMode mode)
     {
-        if (EditorApplication.isPlayingOrWillChangePlaymode)
-        {
-            return;
-        }
-
-        if (scene.path != GameScenePath)
+        if (EditorApplication.isPlayingOrWillChangePlaymode || scene.path != GameScenePath)
         {
             return;
         }
@@ -133,58 +171,95 @@ public static class MvpSceneAuthoringTools
         visualsRoot = new GameObject("KenneyVisuals").transform;
         visualsRoot.SetParent(environmentRoot, false);
 
-        AddFittedModel(visualsRoot, FurnitureBasePath + "floorFull.fbx", "Floor_Start", new Vector3(0f, 0f, -10f), Vector3.zero, new Vector3(10f, 0.35f, 8f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "floorFull.fbx", "Floor_Corridor", new Vector3(0f, 0f, -3f), Vector3.zero, new Vector3(4f, 0.35f, 6f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "floorFull.fbx", "Floor_Hub", new Vector3(0f, 0f, 4.5f), Vector3.zero, new Vector3(14f, 0.35f, 11f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "floorFull.fbx", "Floor_LeftBranch", new Vector3(-6f, 0f, 12f), Vector3.zero, new Vector3(4f, 0.35f, 8f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "floorFull.fbx", "Floor_CenterBranch", new Vector3(0f, 0f, 12.5f), Vector3.zero, new Vector3(4f, 0.35f, 9f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "floorFull.fbx", "Floor_RightBranch", new Vector3(6f, 0f, 12f), Vector3.zero, new Vector3(4f, 0.35f, 8f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "floorFull.fbx", "Floor_ElevatorRoom", new Vector3(-6f, 0f, 17f), Vector3.zero, new Vector3(6f, 0.35f, 6f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "floorFull.fbx", "Floor_ShaftRoom", new Vector3(0f, 0f, 18f), Vector3.zero, new Vector3(6f, 0.35f, 6f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "floorFull.fbx", "Floor_StairsRoom", new Vector3(6f, 0f, 17f), Vector3.zero, new Vector3(6f, 0.35f, 6f));
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "bench.fbx", "ReceptionBench", "Anchor_ReceptionBench", Vector3.zero, new Vector3(2.4f, 0.9f, 0.8f), true);
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "bench.fbx", "HubBench", "Anchor_HubBench", new Vector3(0f, 90f, 0f), new Vector3(2.4f, 0.9f, 0.8f), true);
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "bench.fbx", "StorageBench", "Anchor_StorageBench", Vector3.zero, new Vector3(2.2f, 0.9f, 0.8f), true);
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "bench.fbx", "UtilityBench", "Anchor_UtilityBench", Vector3.zero, new Vector3(2.2f, 0.9f, 0.8f), true);
 
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wall.fbx", "Wall_StartSouth", new Vector3(0f, 1.6f, -14f), Vector3.zero, new Vector3(10f, 3.2f, 0.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wall.fbx", "Wall_StartWest", new Vector3(-5f, 1.6f, -10f), new Vector3(0f, 90f, 0f), new Vector3(8f, 3.2f, 0.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wall.fbx", "Wall_StartEast", new Vector3(5f, 1.6f, -10f), new Vector3(0f, 90f, 0f), new Vector3(8f, 3.2f, 0.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wallDoorwayWide.fbx", "Wall_StartNorthDoor", new Vector3(0f, 1.6f, -6f), Vector3.zero, new Vector3(10f, 3.2f, 0.4f));
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "desk.fbx", "HubDesk", "Anchor_HubDesk", new Vector3(0f, -90f, 0f), new Vector3(2.1f, 1f, 1.15f), true);
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "desk.fbx", "OfficeDeskA", "Anchor_OfficeDeskA", new Vector3(0f, -90f, 0f), new Vector3(1.9f, 1f, 1.05f), true);
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "desk.fbx", "OfficeDeskB", "Anchor_OfficeDeskB", new Vector3(0f, -90f, 0f), new Vector3(1.9f, 1f, 1.05f), true);
 
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wall.fbx", "Wall_CorridorWest", new Vector3(-2f, 1.6f, -3f), new Vector3(0f, 90f, 0f), new Vector3(6f, 3.2f, 0.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wall.fbx", "Wall_CorridorEast", new Vector3(2f, 1.6f, -3f), new Vector3(0f, 90f, 0f), new Vector3(6f, 3.2f, 0.4f));
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "chairDesk.fbx", "HubChair", "Anchor_HubChair", new Vector3(0f, 42f, 0f), new Vector3(0.95f, 1f, 0.95f), true);
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "chairDesk.fbx", "OfficeChairA", "Anchor_OfficeChairA", new Vector3(0f, 42f, 0f), new Vector3(0.95f, 1f, 0.95f), true);
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "chairDesk.fbx", "OfficeChairB", "Anchor_OfficeChairB", new Vector3(0f, 42f, 0f), new Vector3(0.95f, 1f, 0.95f), true);
 
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wallDoorwayWide.fbx", "Wall_HubSouth", new Vector3(0f, 1.6f, -1f), Vector3.zero, new Vector3(14f, 3.2f, 0.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wall.fbx", "Wall_HubWest", new Vector3(-7f, 1.6f, 4.5f), new Vector3(0f, 90f, 0f), new Vector3(11f, 3.2f, 0.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wall.fbx", "Wall_HubEast", new Vector3(7f, 1.6f, 4.5f), new Vector3(0f, 90f, 0f), new Vector3(11f, 3.2f, 0.4f));
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "televisionModern.fbx", "HubMonitor", "Anchor_HubMonitor", new Vector3(0f, -90f, 0f), new Vector3(0.75f, 0.75f, 0.35f), false);
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "televisionModern.fbx", "OfficeMonitorA", "Anchor_OfficeMonitorA", new Vector3(0f, -90f, 0f), new Vector3(0.68f, 0.68f, 0.3f), false);
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "televisionModern.fbx", "OfficeMonitorB", "Anchor_OfficeMonitorB", new Vector3(0f, -90f, 0f), new Vector3(0.68f, 0.68f, 0.3f), false);
 
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wallDoorwayWide.fbx", "Wall_ElevatorDoor", new Vector3(-6f, 1.6f, 14f), Vector3.zero, new Vector3(6f, 3.2f, 0.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wall.fbx", "Wall_ElevatorWest", new Vector3(-9f, 1.6f, 17f), new Vector3(0f, 90f, 0f), new Vector3(6f, 3.2f, 0.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wall.fbx", "Wall_ElevatorEast", new Vector3(-3f, 1.6f, 17f), new Vector3(0f, 90f, 0f), new Vector3(6f, 3.2f, 0.4f));
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "cardboardBoxClosed.fbx", "StorageBoxA", "Anchor_StorageBoxesA", new Vector3(0f, 18f, 0f), new Vector3(1.3f, 1.3f, 1.3f), true);
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "cardboardBoxOpen.fbx", "StorageBoxB", "Anchor_StorageBoxesB", new Vector3(0f, -24f, 0f), new Vector3(0.9f, 0.9f, 0.9f), true, new Vector3(0.2f, 0f, 0.25f));
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "cardboardBoxClosed.fbx", "UtilityBox", "Anchor_UtilityBox", new Vector3(0f, 18f, 0f), new Vector3(1.1f, 1.1f, 1.1f), true);
 
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wallDoorwayWide.fbx", "Wall_ShaftDoor", new Vector3(0f, 1.6f, 15f), Vector3.zero, new Vector3(6f, 3.2f, 0.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wall.fbx", "Wall_ShaftWest", new Vector3(-3f, 1.6f, 18f), new Vector3(0f, 90f, 0f), new Vector3(6f, 3.2f, 0.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wall.fbx", "Wall_ShaftEast", new Vector3(3f, 1.6f, 18f), new Vector3(0f, 90f, 0f), new Vector3(6f, 3.2f, 0.4f));
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "trashcan.fbx", "ReceptionTrash", "Anchor_ReceptionTrash", Vector3.zero, new Vector3(0.65f, 0.85f, 0.65f), true);
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "trashcan.fbx", "OfficeTrash", "Anchor_OfficeTrash", Vector3.zero, new Vector3(0.65f, 0.85f, 0.65f), true);
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "trashcan.fbx", "UtilityTrash", "Anchor_UtilityTrash", Vector3.zero, new Vector3(0.65f, 0.85f, 0.65f), true);
 
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wallDoorwayWide.fbx", "Wall_StairsDoor", new Vector3(6f, 1.6f, 14f), Vector3.zero, new Vector3(6f, 3.2f, 0.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wall.fbx", "Wall_StairsWest", new Vector3(3f, 1.6f, 17f), new Vector3(0f, 90f, 0f), new Vector3(6f, 3.2f, 0.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "wall.fbx", "Wall_StairsEast", new Vector3(9f, 1.6f, 17f), new Vector3(0f, 90f, 0f), new Vector3(6f, 3.2f, 0.4f));
-
-        AddFittedModel(visualsRoot, FurnitureBasePath + "bench.fbx", "Prop_Bench", new Vector3(2.2f, 0.35f, -12.2f), new Vector3(0f, 180f, 0f), new Vector3(2.4f, 0.9f, 0.8f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "cardboardBoxClosed.fbx", "Prop_BoxClosed", new Vector3(-2.3f, 0.8f, -11.3f), new Vector3(0f, 14f, 0f), new Vector3(1.4f, 1.4f, 1.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "cardboardBoxOpen.fbx", "Prop_BoxOpen", new Vector3(-1.1f, 0.55f, -10.5f), new Vector3(0f, -12f, 0f), new Vector3(1f, 1f, 1f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "desk.fbx", "Prop_Desk", new Vector3(4.2f, 0.52f, 3.6f), new Vector3(0f, -90f, 0f), new Vector3(2.2f, 1f, 1.2f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "chairDesk.fbx", "Prop_Chair", new Vector3(3.5f, 0.45f, 2.8f), new Vector3(0f, 45f, 0f), new Vector3(0.95f, 1f, 0.95f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "trashcan.fbx", "Prop_Trashcan", new Vector3(-5.6f, 0.45f, 3f), Vector3.zero, new Vector3(0.8f, 1f, 0.8f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "televisionModern.fbx", "Prop_Monitor", new Vector3(4.2f, 1.18f, 3.55f), new Vector3(0f, -90f, 0f), new Vector3(0.8f, 0.8f, 0.4f));
-        AddFittedModel(visualsRoot, FurnitureBasePath + "stairsOpen.fbx", "Prop_Stairs", new Vector3(6f, 0.1f, 16.6f), new Vector3(0f, 180f, 0f), new Vector3(3.2f, 2.2f, 4.5f));
-        AddFittedModel(visualsRoot, BuildingBasePath + "door-rotate-square-a.fbx", "Prop_ElevatorDoor", new Vector3(-6f, 1.2f, 19.7f), Vector3.zero, new Vector3(2f, 2.4f, 0.2f));
+        AddModelAtAnchor(visualsRoot, FurnitureBasePath + "stairsOpen.fbx", "StairsVisual", "Anchor_StairsModel", new Vector3(0f, 180f, 0f), new Vector3(3f, 2.2f, 5f), false);
+        AddGeneratedDoors(visualsRoot, environmentRoot);
     }
 
     private static bool AssetsAvailable()
     {
-        return AssetDatabase.LoadAssetAtPath<GameObject>(FurnitureBasePath + "floorFull.fbx") != null;
+        return AssetDatabase.LoadAssetAtPath<GameObject>(FurnitureBasePath + "bench.fbx") != null;
     }
 
-    private static void AddFittedModel(Transform parent, string assetPath, string instanceName, Vector3 position, Vector3 rotationEuler, Vector3 targetSize)
+    private static void AddGeneratedDoors(Transform parent, Transform environmentRoot)
     {
+        var doorAnchors = environmentRoot.GetComponentsInChildren<GeneratedDoorAnchor>(true);
+        for (var i = 0; i < doorAnchors.Length; i++)
+        {
+            var anchor = doorAnchors[i];
+            switch (anchor.VisualType)
+            {
+                case GeneratedDoorVisualType.Office:
+                    AddModelAtTransform(parent, BuildingBasePath + "door-rotate-square-a.fbx", "OfficeDoorVisual", anchor.transform, new Vector3(0f, 90f, 0f), new Vector3(1.7f, 2.2f, 0.16f), false, new Vector3(-0.42f, 0f, 0f));
+                    break;
+                case GeneratedDoorVisualType.Service:
+                    AddModelAtTransform(parent, BuildingBasePath + "door-rotate-square-a.fbx", "ServiceDoorVisual", anchor.transform, new Vector3(0f, 90f, 0f), new Vector3(1.8f, 2.2f, 0.16f), false, new Vector3(-0.2f, 0f, 0f));
+                    break;
+                case GeneratedDoorVisualType.Exit:
+                    AddModelAtTransform(parent, BuildingBasePath + "door-rotate-square-a.fbx", "ExitDoorVisual", anchor.transform, Vector3.zero, new Vector3(1.8f, 2.2f, 0.16f), false);
+                    break;
+                case GeneratedDoorVisualType.ElevatorLeft:
+                    AddModelAtTransform(parent, BuildingBasePath + "door-rotate-square-a.fbx", "ElevatorLeftVisual", anchor.transform, Vector3.zero, new Vector3(1.95f, 2.2f, 0.14f), false);
+                    break;
+                case GeneratedDoorVisualType.ElevatorRight:
+                    AddModelAtTransform(parent, BuildingBasePath + "door-rotate-square-a.fbx", "ElevatorRightVisual", anchor.transform, Vector3.zero, new Vector3(1.95f, 2.2f, 0.14f), false);
+                    break;
+            }
+        }
+    }
+
+    private static void AddModelAtAnchor(Transform parent, string assetPath, string instanceName, string anchorName, Vector3 rotationEuler, Vector3 targetSize, bool addCollider)
+    {
+        AddModelAtAnchor(parent, assetPath, instanceName, anchorName, rotationEuler, targetSize, addCollider, Vector3.zero);
+    }
+
+    private static void AddModelAtAnchor(Transform parent, string assetPath, string instanceName, string anchorName, Vector3 rotationEuler, Vector3 targetSize, bool addCollider, Vector3 localOffset)
+    {
+        var anchor = FindDeepChild(parent.root, anchorName);
+        if (anchor == null)
+        {
+            return;
+        }
+
+        AddModelAtTransform(parent, assetPath, instanceName, anchor, rotationEuler, targetSize, addCollider, localOffset);
+    }
+
+    private static void AddModelAtTransform(Transform parent, string assetPath, string instanceName, Transform anchor, Vector3 rotationEuler, Vector3 targetSize, bool addCollider)
+    {
+        AddModelAtTransform(parent, assetPath, instanceName, anchor, rotationEuler, targetSize, addCollider, Vector3.zero);
+    }
+
+    private static void AddModelAtTransform(Transform parent, string assetPath, string instanceName, Transform anchor, Vector3 rotationEuler, Vector3 targetSize, bool addCollider, Vector3 localOffset)
+    {
+        if (anchor == null)
+        {
+            return;
+        }
+
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
         if (prefab == null)
         {
@@ -199,14 +274,17 @@ public static class MvpSceneAuthoringTools
 
         instance.name = instanceName;
         instance.transform.SetParent(parent, false);
-        instance.transform.position = position;
-        instance.transform.rotation = Quaternion.Euler(rotationEuler);
+        instance.transform.position = anchor.position + localOffset;
+        instance.transform.rotation = anchor.rotation * Quaternion.Euler(rotationEuler);
         instance.transform.localScale = Vector3.one;
-
-        FitObjectToBounds(instance, position, targetSize);
+        FitObjectToBounds(instance, targetSize);
+        if (addCollider)
+        {
+            AddMeshColliders(instance);
+        }
     }
 
-    private static void FitObjectToBounds(GameObject instance, Vector3 targetCenter, Vector3 targetSize)
+    private static void FitObjectToBounds(GameObject instance, Vector3 targetSize)
     {
         var renderers = instance.GetComponentsInChildren<Renderer>();
         if (renderers.Length == 0)
@@ -222,21 +300,50 @@ public static class MvpSceneAuthoringTools
 
         var sourceSize = bounds.size;
         var scale = Vector3.one;
-
         scale.x = sourceSize.x > 0.001f ? targetSize.x / sourceSize.x : 1f;
         scale.y = sourceSize.y > 0.001f ? targetSize.y / sourceSize.y : 1f;
         scale.z = sourceSize.z > 0.001f ? targetSize.z / sourceSize.z : 1f;
-
         instance.transform.localScale = scale;
+    }
 
-        renderers = instance.GetComponentsInChildren<Renderer>();
-        bounds = renderers[0].bounds;
-        for (var i = 1; i < renderers.Length; i++)
+    private static void AddMeshColliders(GameObject instance)
+    {
+        var meshFilters = instance.GetComponentsInChildren<MeshFilter>();
+        for (var i = 0; i < meshFilters.Length; i++)
         {
-            bounds.Encapsulate(renderers[i].bounds);
+            var meshFilter = meshFilters[i];
+            if (meshFilter.sharedMesh == null)
+            {
+                continue;
+            }
+
+            var collider = meshFilter.gameObject.GetComponent<MeshCollider>();
+            if (collider == null)
+            {
+                collider = meshFilter.gameObject.AddComponent<MeshCollider>();
+            }
+
+            collider.sharedMesh = meshFilter.sharedMesh;
+        }
+    }
+
+    private static Transform FindDeepChild(Transform parent, string childName)
+    {
+        if (parent.name == childName)
+        {
+            return parent;
         }
 
-        instance.transform.position += targetCenter - bounds.center;
+        for (var i = 0; i < parent.childCount; i++)
+        {
+            var result = FindDeepChild(parent.GetChild(i), childName);
+            if (result != null)
+            {
+                return result;
+            }
+        }
+
+        return null;
     }
 }
 }

@@ -56,7 +56,7 @@ public static class MvpEnvironmentBuilder
     }
 
     public const string RootName = "MVP_Environment";
-    public const string LayoutVersionName = "Layout_v6_CoreFirstOffice";
+    public const string LayoutVersionName = "Layout_v7_GridValidatedOffice";
 
     private static MaterialPalette _palette;
 
@@ -100,6 +100,11 @@ public static class MvpEnvironmentBuilder
         new GameObject(LayoutVersionName).transform.SetParent(root.transform, false);
         var info = root.AddComponent<GeneratedFloorInfo>();
         info.Configure(seed, report.BuildSummary());
+        var debugGrid = root.AddComponent<DebugGridGizmos>();
+        if (result.FloorData != null && result.ValidationReport != null)
+        {
+            debugGrid.Configure(result.FloorData, result.ValidationReport);
+        }
 
         var goalsObject = new GameObject("FloorGoals");
         goalsObject.transform.SetParent(root.transform, false);

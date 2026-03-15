@@ -72,6 +72,8 @@ public static class MvpRuntimeContent
         var shaftTemplate = CreateRoomTemplate("exit_shaft", RoomCategory.ExitShaft, new Vector2Int(4, 3), true);
         var stairsTemplate = CreateRoomTemplate("exit_stairs", RoomCategory.ExitStairs, new Vector2Int(4, 4), true);
 
+        var validationConfig = new ValidationConfig();
+        var outsideTheme = CreateRuntimeAsset<OutsideThemeProfile>("DefaultOutsideTheme");
         var settings = CreateRuntimeAsset<FloorGeneratorSettings>("DefaultFloorSettings");
         settings.Configure(4f, 0.24f, 3.25f, 0.28f, 2, 4, 24, new[]
         {
@@ -84,7 +86,7 @@ public static class MvpRuntimeContent
             elevatorTemplate,
             shaftTemplate,
             stairsTemplate,
-        });
+        }, validationConfig, outsideTheme);
 
         var items = new[] { keycard, fuse, tape, repairedFuse, crowbar, rope, lockpick };
         var recipes = new[] { repairFuseRecipe };
@@ -127,3 +129,4 @@ public static class MvpRuntimeContent
     }
 }
 }
+

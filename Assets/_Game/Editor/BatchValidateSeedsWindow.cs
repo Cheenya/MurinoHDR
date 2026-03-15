@@ -13,6 +13,14 @@ namespace MurinoHDR.Editor
 
 public sealed class BatchValidateSeedsWindow : EditorWindow
 {
+    private const string EnvStartSeed = "MURINO_BATCH_START_SEED";
+    private const string EnvCount = "MURINO_BATCH_COUNT";
+    private const string EnvMaxAttempts = "MURINO_BATCH_MAX_ATTEMPTS";
+    private const string EnvStyle = "MURINO_BATCH_STYLE";
+    private const string EnvOutputName = "MURINO_BATCH_OUTPUT";
+    private const string EnvMinSuccessRate = "MURINO_BATCH_MIN_SUCCESS_RATE";
+    private const string EnvMaxAllowedFailures = "MURINO_BATCH_MAX_ALLOWED_FAILURES";
+
     [Serializable]
     private sealed class BatchValidationEntry
     {
@@ -55,11 +63,90 @@ public sealed class BatchValidateSeedsWindow : EditorWindow
     private Vector2 _scroll;
     private string _lastSummary = string.Empty;
 
+    private sealed class BatchRunSettings
+    {
+        public int StartSeed;
+        public int Count;
+        public int MaxAttempts;
+        public bool UseStyleOverride;
+        public FloorStyle StyleOverride;
+        public string OutputName = "batch_validation";
+    }
+
+    private sealed class BatchRunResult
+    {
+        public BatchValidationSummary Summary;
+        public string CsvPath = string.Empty;
+        public string JsonPath = string.Empty;
+        public string SummaryText = string.Empty;
+    }
+
     [MenuItem("Tools/Murino/Batch Validate Seeds...")]
     public static void Open()
     {
         var window = GetWindow<BatchValidateSeedsWindow>("Batch Validate Seeds");
         window.minSize = new Vector2(480f, 320f);
+    }
+
+    public static void RunBatchValidationFromCommandLine()
+    {
+        try
+        {
+            var settings = new BatchRunSettings();
+            settings.StartSeed = ParseIntEnv(EnvStartSeed, 1000);
+            settings.Count = Mathf.Max(1, ParseIntEnv(EnvCount, 100));
+            settings.MaxAttempts = Mathf.Max(1, ParseIntEnv(EnvMaxAttempts, 5));
+            settings.OutputName = ParseStringEnv(EnvOutputName, "batch_validation_cli");
+
+            var styleValue = ParseStringEnv(EnvStyle, string.Empty);
+            FloorStyle parsedStyle;
+            if (!string.IsNullOrWhiteSpace(styleValue) && Enum.TryParse(styleValue, true, out parsedStyle))
+            {
+                settings.UseStyleOverride = true;
+                settings.StyleOverride = parsedStyle;
+            }
+
+            var minSuccessRate = Mathf.Clamp01(ParseFloatEnv(EnvMinSuccessRate, 1f));
+            var maxAllowedFailures = Mathf.Max(0, ParseIntEnv(EnvMaxAllowedFailures, 0));
+
+            var runResult = RunBatch(settings);
+            Debug.Log(string.Format("[GEN] CLI batch validation finished: {0}", runResult.SummaryText));
+
+            var failureCount = 0;
+            if (runResult.Summary != null)
+            {
+                for (var i = 0; i < runResult.Summary.Entries.Count; i++)
+                {
+                    if (!runResult.Summary.Entries[i].Success)
+                    {
+                        failureCount++;
+                    }
+                }
+            }
+
+            var successRate = runResult.Summary != null ? runResult.Summary.SuccessRate : 0f;
+            var passed = successRate >= minSuccessRate && failureCount <= maxAllowedFailures;
+            if (!passed)
+            {
+                Debug.LogError(string.Format(
+                    "[GEN] Batch validation gate failed. SuccessRate={0:P2}, MinSuccessRate={1:P2}, Failures={2}, MaxAllowedFailures={3}, CSV={4}, JSON={5}",
+                    successRate,
+                    minSuccessRate,
+                    failureCount,
+                    maxAllowedFailures,
+                    runResult.CsvPath,
+                    runResult.JsonPath));
+                EditorApplication.Exit(1);
+                return;
+            }
+
+            EditorApplication.Exit(0);
+        }
+        catch (Exception exception)
+        {
+            Debug.LogException(exception);
+            EditorApplication.Exit(1);
+        }
     }
 
     private void OnGUI()
@@ -79,7 +166,14 @@ public sealed class BatchValidateSeedsWindow : EditorWindow
         EditorGUILayout.Space(8f);
         if (GUILayout.Button("Run Batch Validation", GUILayout.Height(28f)))
         {
-            RunBatch();
+            var settings = new BatchRunSettings();
+            settings.StartSeed = _startSeed;
+            settings.Count = _count;
+            settings.MaxAttempts = _maxAttempts;
+            settings.UseStyleOverride = _useStyleOverride;
+            settings.StyleOverride = _styleOverride;
+            settings.OutputName = _outputName;
+            _lastSummary = RunBatch(settings).SummaryText;
         }
 
         if (!string.IsNullOrEmpty(_lastSummary))
@@ -91,30 +185,30 @@ public sealed class BatchValidateSeedsWindow : EditorWindow
         EditorGUILayout.EndScrollView();
     }
 
-    private void RunBatch()
+    private static BatchRunResult RunBatch(BatchRunSettings runSettings)
     {
         MvpRuntimeContent.EnsureInitialized();
         var baseSettings = MvpRuntimeContent.Catalog.GeneratorSettings;
-        var settings = CloneSettings(baseSettings, _maxAttempts);
-        var reportRoot = Path.Combine(Directory.GetCurrentDirectory(), "Reports");
+        var settings = CloneSettings(baseSettings, runSettings.MaxAttempts);
+        var reportRoot = Path.Combine(GetProjectRootPath(), "Reports");
         Directory.CreateDirectory(reportRoot);
 
         var summary = new BatchValidationSummary();
         summary.GeneratedAt = DateTime.UtcNow.ToString("O");
-        summary.StartSeed = _startSeed;
-        summary.Count = _count;
-        summary.MaxAttempts = _maxAttempts;
-        summary.UseStyleOverride = _useStyleOverride;
-        summary.StyleOverride = _useStyleOverride ? _styleOverride.ToString() : string.Empty;
+        summary.StartSeed = runSettings.StartSeed;
+        summary.Count = runSettings.Count;
+        summary.MaxAttempts = runSettings.MaxAttempts;
+        summary.UseStyleOverride = runSettings.UseStyleOverride;
+        summary.StyleOverride = runSettings.UseStyleOverride ? runSettings.StyleOverride.ToString() : string.Empty;
 
         var successCount = 0;
         var totalAttempts = 0f;
         var failCodeFrequency = new Dictionary<ValidationErrorCode, int>();
 
-        for (var i = 0; i < _count; i++)
+        for (var i = 0; i < runSettings.Count; i++)
         {
-            var seed = _startSeed + i;
-            var generation = FloorGenerator.Generate(seed, settings, _useStyleOverride ? _styleOverride : (FloorStyle?)null);
+            var seed = runSettings.StartSeed + i;
+            var generation = FloorGenerator.Generate(seed, settings, runSettings.UseStyleOverride ? runSettings.StyleOverride : (FloorStyle?)null);
             var validation = FloorGenerator.Validate(generation, settings);
             var detailed = validation.DetailedReport ?? generation.ValidationReport;
             var entry = BuildEntry(seed, generation, detailed);
@@ -136,28 +230,66 @@ public sealed class BatchValidateSeedsWindow : EditorWindow
             }
         }
 
-        summary.SuccessRate = _count > 0 ? successCount / (float)_count : 0f;
-        summary.AverageAttempts = _count > 0 ? totalAttempts / _count : 0f;
+        summary.SuccessRate = runSettings.Count > 0 ? successCount / (float)runSettings.Count : 0f;
+        summary.AverageAttempts = runSettings.Count > 0 ? totalAttempts / runSettings.Count : 0f;
         summary.TopFailCodes = failCodeFrequency
             .OrderByDescending(pair => pair.Value)
             .Take(5)
             .Select(pair => string.Format("{0}:{1}", pair.Key, pair.Value))
             .ToList();
 
-        var baseName = string.IsNullOrWhiteSpace(_outputName) ? "batch_validation" : _outputName.Trim();
+        var baseName = string.IsNullOrWhiteSpace(runSettings.OutputName) ? "batch_validation" : runSettings.OutputName.Trim();
         var csvPath = Path.Combine(reportRoot, baseName + ".csv");
         var jsonPath = Path.Combine(reportRoot, baseName + ".json");
         File.WriteAllText(csvPath, BuildCsv(summary));
         File.WriteAllText(jsonPath, JsonUtility.ToJson(summary, true));
 
-        _lastSummary = string.Format(
+        var result = string.Format(
             "Success {0:P0}, avg attempts {1:0.00}, CSV: {2}, JSON: {3}",
             summary.SuccessRate,
             summary.AverageAttempts,
             csvPath,
             jsonPath);
 
-        Debug.Log(string.Format("[GEN] Batch validation finished. {0}", _lastSummary));
+        Debug.Log(string.Format("[GEN] Batch validation finished. {0}", result));
+        var runResult = new BatchRunResult();
+        runResult.Summary = summary;
+        runResult.CsvPath = csvPath;
+        runResult.JsonPath = jsonPath;
+        runResult.SummaryText = result;
+        return runResult;
+    }
+
+    private static int ParseIntEnv(string name, int fallback)
+    {
+        var raw = Environment.GetEnvironmentVariable(name);
+        int value;
+        return int.TryParse(raw, out value) ? value : fallback;
+    }
+
+    private static float ParseFloatEnv(string name, float fallback)
+    {
+        var raw = Environment.GetEnvironmentVariable(name);
+        float value;
+        return float.TryParse(raw, out value) ? value : fallback;
+    }
+
+    private static string ParseStringEnv(string name, string fallback)
+    {
+        var raw = Environment.GetEnvironmentVariable(name);
+        return string.IsNullOrWhiteSpace(raw) ? fallback : raw.Trim();
+    }
+
+    private static string GetProjectRootPath()
+    {
+        var assetsPath = Application.dataPath;
+        if (string.IsNullOrWhiteSpace(assetsPath))
+        {
+            return Directory.GetCurrentDirectory();
+        }
+
+        var projectRoot = Path.GetDirectoryName(assetsPath);
+        return string.IsNullOrWhiteSpace(projectRoot) ? Directory.GetCurrentDirectory() : projectRoot;
     }
 
     private static BatchValidationEntry BuildEntry(int seed, FloorGenerationResult generation, ValidationReport report)

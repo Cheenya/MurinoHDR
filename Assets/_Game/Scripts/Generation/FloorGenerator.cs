@@ -136,52 +136,45 @@ public sealed class FloorGenerationValidationReport
 
 public static class FloorGenerator
 {
-    private sealed class CandidateRoom
+    private sealed class LayoutParameters
     {
-        public string Name;
-        public RectInt Rect;
-        public RoomCategory[] Variants = Array.Empty<RoomCategory>();
+        public int PlateHalfWidth;
+        public int OpenHalfWidth;
+        public int ReceptionHalfWidth;
+        public int SouthOfficeDepth;
+        public int SouthCorridorDepth;
+        public int WorkDepth;
+        public int CoreDepth;
+        public int ServiceDepth;
+        public int ExitDepth;
+
+        public int OpenMinX => -OpenHalfWidth;
+        public int OpenWidth => OpenHalfWidth * 2;
+        public int SideBandWidth => PlateHalfWidth - OpenHalfWidth;
+        public int SouthCorridorY => SouthOfficeDepth;
+        public int WorkY => SouthCorridorY + SouthCorridorDepth;
+        public int CoreY => WorkY + WorkDepth;
+        public int ServiceY => CoreY + CoreDepth;
+        public int ExitY => ServiceY + ServiceDepth;
     }
 
     public static FloorGenerationResult Generate(int seed, FloorGeneratorSettings settings)
     {
-        var result = new FloorGenerationResult();
-        result.Seed = seed;
-
-        var occupancy = new HashSet<Vector2Int>();
-        var random = new System.Random(seed);
-
-        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Start), new RectInt(-3, 0, 6, 4), "Reception");
-        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Corridor), new RectInt(-1, 4, 2, 5), "MainCorridor");
-        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Hub), new RectInt(-3, 9, 6, 4), "Hub");
-        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Corridor), new RectInt(-3, 13, 6, 2), "ServiceCorridor");
-
-        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.ExitElevator), new RectInt(-3, 15, 2, 3), "ElevatorRoom");
-        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.ExitShaft), new RectInt(-1, 15, 2, 3), "ShaftRoom");
-        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.ExitStairs), new RectInt(1, 15, 2, 3), "StairsRoom");
-
-        var candidates = new List<CandidateRoom>
+        FloorGenerationResult lastCandidate = null;
+        for (var attempt = 0; attempt < 8; attempt++)
         {
-            new CandidateRoom { Name = "WestOfficeSouth", Rect = new RectInt(-6, 4, 5, 3), Variants = new[] { RoomCategory.Office, RoomCategory.Storage } },
-            new CandidateRoom { Name = "WestOfficeNorth", Rect = new RectInt(-6, 7, 5, 4), Variants = new[] { RoomCategory.Office, RoomCategory.Utility } },
-            new CandidateRoom { Name = "WestSupport", Rect = new RectInt(-6, 11, 3, 4), Variants = new[] { RoomCategory.Storage, RoomCategory.Utility } },
-            new CandidateRoom { Name = "EastOfficeSouth", Rect = new RectInt(1, 4, 5, 3), Variants = new[] { RoomCategory.Office, RoomCategory.Utility } },
-            new CandidateRoom { Name = "EastOfficeNorth", Rect = new RectInt(3, 9, 4, 4), Variants = new[] { RoomCategory.Office, RoomCategory.Storage } },
-            new CandidateRoom { Name = "EastSupport", Rect = new RectInt(3, 13, 4, 2), Variants = new[] { RoomCategory.Utility, RoomCategory.Office } },
-        };
+            var attemptSeed = seed + attempt * 97;
+            var candidate = GenerateCandidate(attemptSeed, settings);
+            var report = Validate(candidate, settings);
+            if (report.IsValid)
+            {
+                return candidate;
+            }
 
-        var extraTarget = Mathf.Clamp(random.Next(settings.ExtraRoomsMin + 1, settings.ExtraRoomsMax + 3), 0, candidates.Count);
-        Shuffle(candidates, random);
-        for (var i = 0; i < extraTarget; i++)
-        {
-            var candidate = candidates[i];
-            var category = candidate.Variants[random.Next(0, candidate.Variants.Length)];
-            AddRoom(result, occupancy, settings.GetTemplate(category), candidate.Rect, candidate.Name);
+            lastCandidate = candidate;
         }
 
-        EnsureMinimumSupportRooms(result, occupancy, settings, random);
-        RecalculateWorldOffset(result, settings);
-        return result;
+        return lastCandidate ?? GenerateCandidate(seed, settings);
     }
 
     public static FloorGenerationValidationReport Validate(FloorGenerationResult result, FloorGeneratorSettings settings)
@@ -189,6 +182,80 @@ public static class FloorGenerator
         var report = new FloorGenerationValidationReport();
         report.Seed = result.Seed;
 
+        ValidateOverlaps(result, report);
+        ValidateMandatoryRooms(result, report);
+        ValidateConnectivity(result, report);
+        ValidateExitCluster(result, report);
+        ValidateOfficeMix(result, report);
+        ValidatePerimeterZoning(result, report);
+        ValidateCoreSupportZoning(result, report);
+
+        report.IsValid = report.Issues.Count == 0;
+        return report;
+    }
+
+    private static FloorGenerationResult GenerateCandidate(int seed, FloorGeneratorSettings settings)
+    {
+        var random = new System.Random(seed);
+        var parameters = CreateLayoutParameters(random);
+        var supportOrder = random.NextDouble() < 0.5d
+            ? new[] { RoomCategory.Utility, RoomCategory.Storage }
+            : new[] { RoomCategory.Storage, RoomCategory.Utility };
+
+        var result = new FloorGenerationResult();
+        result.Seed = seed;
+        var occupancy = new HashSet<Vector2Int>();
+
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Start), new RectInt(-parameters.ReceptionHalfWidth, 0, parameters.ReceptionHalfWidth * 2, parameters.SouthOfficeDepth), "Reception");
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Office), new RectInt(-parameters.PlateHalfWidth, 0, parameters.PlateHalfWidth - parameters.ReceptionHalfWidth, parameters.SouthOfficeDepth), "SouthWestOffice");
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Office), new RectInt(parameters.ReceptionHalfWidth, 0, parameters.PlateHalfWidth - parameters.ReceptionHalfWidth, parameters.SouthOfficeDepth), "SouthEastOffice");
+
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Corridor), new RectInt(-parameters.PlateHalfWidth, parameters.SouthCorridorY, parameters.PlateHalfWidth * 2, parameters.SouthCorridorDepth), "SouthCrossCorridor");
+
+        var mainCorridorDepth = Mathf.Max(2, parameters.WorkDepth - 2);
+        var hubDepth = Mathf.Max(2, parameters.WorkDepth - mainCorridorDepth);
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Corridor), new RectInt(parameters.OpenMinX, parameters.WorkY, parameters.OpenWidth, mainCorridorDepth), "MainCorridor");
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Hub), new RectInt(parameters.OpenMinX, parameters.WorkY + mainCorridorDepth, parameters.OpenWidth, hubDepth), "Hub");
+
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Office), new RectInt(-parameters.PlateHalfWidth, parameters.WorkY, parameters.SideBandWidth, parameters.WorkDepth), "WestOfficeSouth");
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Office), new RectInt(parameters.OpenHalfWidth, parameters.WorkY, parameters.SideBandWidth, parameters.WorkDepth), "EastOfficeSouth");
+
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Office), new RectInt(-parameters.PlateHalfWidth, parameters.CoreY, parameters.SideBandWidth, parameters.CoreDepth), "WestOfficeNorth");
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Corridor), new RectInt(parameters.OpenMinX, parameters.CoreY, 2, parameters.CoreDepth), "WestCoreCorridor");
+        AddRoom(result, occupancy, settings.GetTemplate(supportOrder[0]), new RectInt(-3, parameters.CoreY, 3, parameters.CoreDepth), "CoreSupportWest");
+        AddRoom(result, occupancy, settings.GetTemplate(supportOrder[1]), new RectInt(0, parameters.CoreY, 3, parameters.CoreDepth), "CoreSupportEast");
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Corridor), new RectInt(3, parameters.CoreY, 2, parameters.CoreDepth), "EastCoreCorridor");
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Office), new RectInt(parameters.OpenHalfWidth, parameters.CoreY, parameters.SideBandWidth, parameters.CoreDepth), "EastOfficeNorth");
+
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.Corridor), new RectInt(parameters.OpenMinX, parameters.ServiceY, parameters.OpenWidth, parameters.ServiceDepth), "ServiceCorridor");
+
+        var sideExitWidth = (parameters.OpenWidth - 2) / 2;
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.ExitElevator), new RectInt(parameters.OpenMinX, parameters.ExitY, sideExitWidth, parameters.ExitDepth), "ElevatorRoom");
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.ExitShaft), new RectInt(parameters.OpenMinX + sideExitWidth, parameters.ExitY, 2, parameters.ExitDepth), "ShaftRoom");
+        AddRoom(result, occupancy, settings.GetTemplate(RoomCategory.ExitStairs), new RectInt(parameters.OpenMinX + sideExitWidth + 2, parameters.ExitY, sideExitWidth, parameters.ExitDepth), "StairsRoom");
+
+        RecalculateWorldOffset(result, settings);
+        return result;
+    }
+
+    private static LayoutParameters CreateLayoutParameters(System.Random random)
+    {
+        return new LayoutParameters
+        {
+            PlateHalfWidth = random.Next(9, 11),
+            OpenHalfWidth = 5,
+            ReceptionHalfWidth = random.Next(3, 5),
+            SouthOfficeDepth = random.Next(4, 6),
+            SouthCorridorDepth = 2,
+            WorkDepth = random.Next(4, 6),
+            CoreDepth = random.Next(4, 6),
+            ServiceDepth = 2,
+            ExitDepth = 3,
+        };
+    }
+
+    private static void ValidateOverlaps(FloorGenerationResult result, FloorGenerationValidationReport report)
+    {
         var occupancy = new HashSet<Vector2Int>();
         for (var i = 0; i < result.Rooms.Count; i++)
         {
@@ -205,85 +272,6 @@ public static class FloorGenerator
                 }
             }
         }
-
-        ValidateMandatoryRooms(result, report);
-        ValidateConnectivity(result, report);
-        ValidateExitCluster(result, report);
-        ValidateOfficeMix(result, report);
-
-        report.IsValid = report.Issues.Count == 0;
-        return report;
-    }
-
-    private static void EnsureMinimumSupportRooms(FloorGenerationResult result, HashSet<Vector2Int> occupancy, FloorGeneratorSettings settings, System.Random random)
-    {
-        if (HasCategory(result, RoomCategory.Office) && HasCategory(result, RoomCategory.Storage) && HasCategory(result, RoomCategory.Utility))
-        {
-            return;
-        }
-
-        var fallbackCandidates = new List<CandidateRoom>
-        {
-            new CandidateRoom { Name = "FallbackOffice", Rect = new RectInt(1, 7, 5, 2), Variants = new[] { RoomCategory.Office } },
-            new CandidateRoom { Name = "FallbackStorage", Rect = new RectInt(-6, 11, 3, 4), Variants = new[] { RoomCategory.Storage } },
-            new CandidateRoom { Name = "FallbackUtility", Rect = new RectInt(3, 13, 4, 2), Variants = new[] { RoomCategory.Utility } },
-        };
-
-        for (var i = 0; i < fallbackCandidates.Count; i++)
-        {
-            var fallback = fallbackCandidates[i];
-            var targetCategory = fallback.Variants[0];
-            if (HasCategory(result, targetCategory))
-            {
-                continue;
-            }
-
-            if (TryReplaceOrAddRoom(result, occupancy, settings.GetTemplate(targetCategory), fallback.Rect, fallback.Name))
-            {
-                continue;
-            }
-
-            var randomName = string.Format("{0}_{1}", fallback.Name, random.Next(100, 999));
-            TryReplaceOrAddRoom(result, occupancy, settings.GetTemplate(targetCategory), fallback.Rect, randomName);
-        }
-    }
-
-    private static bool TryReplaceOrAddRoom(FloorGenerationResult result, HashSet<Vector2Int> occupancy, RoomTemplate template, RectInt rect, string instanceId)
-    {
-        for (var i = 0; i < result.Rooms.Count; i++)
-        {
-            var existing = result.Rooms[i];
-            if (existing.Rect.Equals(rect))
-            {
-                existing.Template = template;
-                existing.InstanceId = instanceId;
-                return true;
-            }
-        }
-
-        if (CanOccupy(rect, occupancy))
-        {
-            AddRoom(result, occupancy, template, rect, instanceId);
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool CanOccupy(RectInt rect, HashSet<Vector2Int> occupancy)
-    {
-        for (var x = rect.xMin; x < rect.xMax; x++)
-        {
-            for (var y = rect.yMin; y < rect.yMax; y++)
-            {
-                if (occupancy.Contains(new Vector2Int(x, y)))
-                {
-                    return false;
-                }
-            }
-        }
-
-        return true;
     }
 
     private static void ValidateMandatoryRooms(FloorGenerationResult result, FloorGenerationValidationReport report)
@@ -328,7 +316,7 @@ public static class FloorGenerator
             for (var i = 0; i < result.Rooms.Count; i++)
             {
                 var other = result.Rooms[i];
-                if (visited.Contains(other.Index) || !AreAdjacent(room.Rect, other.Rect))
+                if (visited.Contains(other.Index) || !HasTraversableConnection(room, other))
                 {
                     continue;
                 }
@@ -372,6 +360,17 @@ public static class FloorGenerator
         {
             report.Issues.Add("Stairs are not attached to service corridor");
         }
+
+        if (!AreAdjacent(elevator.Rect, shaft.Rect) || !AreAdjacent(shaft.Rect, stairs.Rect))
+        {
+            report.Issues.Add("Exit rooms must form a single service cluster");
+        }
+
+        var bounds = GetLayoutBounds(result);
+        if (!TouchesPerimeter(elevator.Rect, bounds) || !TouchesPerimeter(shaft.Rect, bounds) || !TouchesPerimeter(stairs.Rect, bounds))
+        {
+            report.Issues.Add("Exit rooms must sit on the building perimeter");
+        }
     }
 
     private static void ValidateOfficeMix(FloorGenerationResult result, FloorGenerationValidationReport report)
@@ -390,6 +389,87 @@ public static class FloorGenerator
         {
             report.Issues.Add("No utility room generated");
         }
+    }
+
+    private static void ValidatePerimeterZoning(FloorGenerationResult result, FloorGenerationValidationReport report)
+    {
+        var bounds = GetLayoutBounds(result);
+        for (var i = 0; i < result.Rooms.Count; i++)
+        {
+            var room = result.Rooms[i];
+            if ((room.Category == RoomCategory.Start || room.Category == RoomCategory.Office) && !TouchesPerimeter(room.Rect, bounds))
+            {
+                report.Issues.Add(string.Format("{0} should be on the perimeter/daylight band", room.InstanceId));
+            }
+
+            if ((room.Category == RoomCategory.Storage || room.Category == RoomCategory.Utility) && TouchesPerimeter(room.Rect, bounds))
+            {
+                report.Issues.Add(string.Format("{0} should stay near the core, not on the perimeter", room.InstanceId));
+            }
+        }
+    }
+
+    private static void ValidateCoreSupportZoning(FloorGenerationResult result, FloorGenerationValidationReport report)
+    {
+        for (var i = 0; i < result.Rooms.Count; i++)
+        {
+            var room = result.Rooms[i];
+            if (room.Category != RoomCategory.Storage && room.Category != RoomCategory.Utility)
+            {
+                continue;
+            }
+
+            if (!HasAdjacentCirculationRoom(result, room))
+            {
+                report.Issues.Add(string.Format("Core support room {0} is isolated from circulation", room.InstanceId));
+            }
+        }
+    }
+
+    private static bool HasAdjacentCirculationRoom(FloorGenerationResult result, GeneratedRoom targetRoom)
+    {
+        for (var i = 0; i < result.Rooms.Count; i++)
+        {
+            var other = result.Rooms[i];
+            if (other.Index == targetRoom.Index)
+            {
+                continue;
+            }
+
+            if (IsCirculationRoom(other.Category) && AreAdjacent(targetRoom.Rect, other.Rect))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasTraversableConnection(GeneratedRoom a, GeneratedRoom b)
+    {
+        if (!AreAdjacent(a.Rect, b.Rect))
+        {
+            return false;
+        }
+
+        var aCirculation = IsCirculationRoom(a.Category);
+        var bCirculation = IsCirculationRoom(b.Category);
+        if (aCirculation && bCirculation)
+        {
+            return true;
+        }
+
+        return (aCirculation && IsEnclosedProgram(b.Category)) || (bCirculation && IsEnclosedProgram(a.Category));
+    }
+
+    private static bool IsCirculationRoom(RoomCategory category)
+    {
+        return category == RoomCategory.Start || category == RoomCategory.Corridor || category == RoomCategory.Hub;
+    }
+
+    private static bool IsEnclosedProgram(RoomCategory category)
+    {
+        return category == RoomCategory.Office || category == RoomCategory.Storage || category == RoomCategory.Utility || category == RoomCategory.ExitElevator || category == RoomCategory.ExitShaft || category == RoomCategory.ExitStairs;
     }
 
     private static GeneratedRoom FindRoom(FloorGenerationResult result, string instanceId)
@@ -472,15 +552,27 @@ public static class FloorGenerator
         return false;
     }
 
-    private static void Shuffle<T>(IList<T> items, System.Random random)
+    private static RectInt GetLayoutBounds(FloorGenerationResult result)
     {
-        for (var i = items.Count - 1; i > 0; i--)
+        var minX = int.MaxValue;
+        var minY = int.MaxValue;
+        var maxX = int.MinValue;
+        var maxY = int.MinValue;
+        for (var i = 0; i < result.Rooms.Count; i++)
         {
-            var j = random.Next(0, i + 1);
-            var temp = items[i];
-            items[i] = items[j];
-            items[j] = temp;
+            var rect = result.Rooms[i].Rect;
+            minX = Mathf.Min(minX, rect.xMin);
+            minY = Mathf.Min(minY, rect.yMin);
+            maxX = Mathf.Max(maxX, rect.xMax);
+            maxY = Mathf.Max(maxY, rect.yMax);
         }
+
+        return new RectInt(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    private static bool TouchesPerimeter(RectInt rect, RectInt bounds)
+    {
+        return rect.xMin == bounds.xMin || rect.xMax == bounds.xMax || rect.yMin == bounds.yMin || rect.yMax == bounds.yMax;
     }
 }
 }

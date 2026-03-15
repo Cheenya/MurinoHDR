@@ -56,7 +56,7 @@ public static class MvpEnvironmentBuilder
     }
 
     public const string RootName = "MVP_Environment";
-    public const string LayoutVersionName = "Layout_v5_Office";
+    public const string LayoutVersionName = "Layout_v6_CoreFirstOffice";
 
     private static MaterialPalette _palette;
 

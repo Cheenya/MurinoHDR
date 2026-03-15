@@ -65,7 +65,10 @@ public static class PlayerBuilder
         var bodyRenderer = visual.GetComponent<Renderer>();
         if (bodyRenderer != null)
         {
-            bodyRenderer.material.color = new Color(0.22f, 0.35f, 0.48f);
+            var shader = Shader.Find("HDRP/Lit") ?? Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            var material = new Material(shader != null ? shader : Shader.Find("Sprites/Default"));
+            material.color = new Color(0.22f, 0.35f, 0.48f);
+            bodyRenderer.sharedMaterial = material;
         }
 
         var cameraObject = new GameObject("PlayerCamera");

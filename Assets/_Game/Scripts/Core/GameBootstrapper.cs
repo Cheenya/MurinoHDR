@@ -137,6 +137,23 @@ public sealed class GameBootstrapper : MonoBehaviour
         }
         if (spawn == null)
         {
+            var roomMarkers = environment.GetComponentsInChildren<GeneratedRoomMarker>(true);
+            for (var i = 0; i < roomMarkers.Length; i++)
+            {
+                if (roomMarkers[i].Category != RoomCategory.Start)
+                {
+                    continue;
+                }
+
+                spawn = roomMarkers[i].transform.Find("Spawn_PlayerStart");
+                if (spawn != null)
+                {
+                    break;
+                }
+            }
+        }
+        if (spawn == null)
+        {
             return;
         }
 

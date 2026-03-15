@@ -5,6 +5,7 @@ using MurinoHDR.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace MurinoHDR.Editor
 {
@@ -96,12 +97,16 @@ public static class MvpSceneAuthoringTools
     private static void CleanLegacySceneObjects()
     {
         var legacyRoots = new[] { "Main Camera", "Sun", "Sky and Fog Volume" };
-        for (var i = 0; i < legacyRoots.Length; i++)
+        var roots = SceneManager.GetActiveScene().GetRootGameObjects();
+        for (var i = 0; i < roots.Length; i++)
         {
-            var root = GameObject.Find(legacyRoots[i]);
-            if (root != null)
+            for (var j = 0; j < legacyRoots.Length; j++)
             {
-                Object.DestroyImmediate(root);
+                if (roots[i].name == legacyRoots[j])
+                {
+                    Object.DestroyImmediate(roots[i]);
+                    break;
+                }
             }
         }
     }

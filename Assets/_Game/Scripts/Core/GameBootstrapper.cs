@@ -95,8 +95,8 @@ public sealed class GameBootstrapper : MonoBehaviour
     private static void EnsureGameSceneSetup()
     {
         CleanupLegacySceneObjects();
-        var player = PlayerBuilder.EnsurePlayer();
-        var environment = MvpEnvironmentBuilder.EnsureEnvironment();
+        var player = PlayerBuilder.RebuildPlayer();
+        var environment = MvpEnvironmentBuilder.RebuildEnvironment();
         PlacePlayerAtSpawn(player, environment);
 
         if (FindFirstObjectByType<InteractionPromptUI>() == null)
@@ -109,12 +109,16 @@ public sealed class GameBootstrapper : MonoBehaviour
     private static void CleanupLegacySceneObjects()
     {
         var legacyRoots = new[] { "Main Camera", "Sun", "Sky and Fog Volume" };
-        for (var i = 0; i < legacyRoots.Length; i++)
+        var roots = SceneManager.GetActiveScene().GetRootGameObjects();
+        for (var i = 0; i < roots.Length; i++)
         {
-            var root = GameObject.Find(legacyRoots[i]);
-            if (root != null)
+            for (var j = 0; j < legacyRoots.Length; j++)
             {
-                Destroy(root);
+                if (roots[i].name == legacyRoots[j])
+                {
+                    Destroy(roots[i]);
+                    break;
+                }
             }
         }
     }

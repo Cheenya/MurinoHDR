@@ -68,12 +68,13 @@ public static class PlayerBuilder
             bodyRenderer.material.color = new Color(0.22f, 0.35f, 0.48f);
         }
 
-        var cameraObject = new GameObject("Main Camera");
+        var cameraObject = new GameObject("PlayerCamera");
         cameraObject.tag = "MainCamera";
         cameraObject.transform.SetParent(player.transform, false);
         cameraObject.transform.localPosition = new Vector3(0f, 0.72f, 0f);
 
         var playerCamera = cameraObject.AddComponent<Camera>();
+        playerCamera.enabled = true;
         playerCamera.nearClipPlane = 0.03f;
         playerCamera.fieldOfView = 78f;
         var audioListener = cameraObject.AddComponent<AudioListener>();
@@ -91,6 +92,11 @@ public static class PlayerBuilder
 
     private static void EnsureSingleGameplayCamera(GameObject playerRoot, Camera playerCamera, AudioListener playerAudioListener)
     {
+        if (playerCamera != null)
+        {
+            playerCamera.enabled = true;
+        }
+
         var cameras = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
         for (var i = 0; i < cameras.Length; i++)
         {

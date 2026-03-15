@@ -35,6 +35,12 @@ public static class GenerationDefinitions
         Register(CreateWarehouse());
         Register(CreateTechCorridor());
         Register(CreateVentSegment());
+        Register(CreateMeetingRoom());
+        Register(CreateSecurityRoom());
+        Register(CreateServerRoom());
+        Register(CreatePrintCopyRoom());
+        Register(CreateRestroom());
+        Register(CreateManagerOffice());
         Register(CreateReception());
         Register(CreateStartCheckpoint());
         Register(CreateElevatorLobby());
@@ -257,6 +263,165 @@ public static class GenerationDefinitions
             RoomTags.FacadePreferred | RoomTags.FacadeRoom | RoomTags.SafeSpotCandidate | RoomTags.LogicRoom,
             5f, 10f, 4f, 8f,
             0.8f, 0.2f, true, 1, 1,
+            new[] { pattern });
+    }
+
+    private static RoomTypeDef CreateMeetingRoom()
+    {
+        var pattern = CreatePattern(
+            "meeting_table_board",
+            AnchorPlan.Center,
+            new[]
+            {
+                Req(PropCategory.TableLarge, 1, 1, true, PlacementHint.Center),
+                Req(PropCategory.Chair, 4, 8, false, PlacementHint.Center),
+                Req(PropCategory.Whiteboard, 1, 1, false, PlacementHint.AlongWall),
+            },
+            new[]
+            {
+                Req(PropCategory.TV, 0, 1, false, PlacementHint.AlongWall),
+                Req(PropCategory.PlantSmall, 0, 2, false, PlacementHint.NearWindow),
+                Req(PropCategory.WaterCooler, 0, 1, false, PlacementHint.AlongWall),
+            },
+            3);
+
+        return CreateRoomDef(
+            RoomType.MeetingRoom,
+            RoomTags.FacadePreferred | RoomTags.FacadeRoom | RoomTags.RequiresWindow | RoomTags.LogicRoom,
+            4f, 8f, 4f, 8f,
+            0.8f, 0.2f, true, 0, 2,
+            new[] { pattern });
+    }
+
+    private static RoomTypeDef CreateSecurityRoom()
+    {
+        var pattern = CreatePattern(
+            "security_console",
+            AnchorPlan.AlongWall,
+            new[]
+            {
+                Req(PropCategory.Desk, 1, 2, true, PlacementHint.AlongWall),
+                Req(PropCategory.Monitor, 2, 4, false, PlacementHint.AlongWall),
+                Req(PropCategory.Cabinet, 1, 1, true, PlacementHint.Corner),
+                Req(PropCategory.WarningSign, 1, 1, false, PlacementHint.NearDoor),
+            },
+            new[]
+            {
+                Req(PropCategory.WaterCooler, 0, 1, false, PlacementHint.AlongWall),
+                Req(PropCategory.EvacPlan, 0, 1, false, PlacementHint.NearDoor),
+            },
+            2);
+
+        return CreateRoomDef(
+            RoomType.SecurityRoom,
+            RoomTags.CorePreferred | RoomTags.LogicRoom | RoomTags.Support,
+            3f, 6f, 3f, 6f,
+            0.2f, 0.85f, false, 0, 1,
+            new[] { pattern });
+    }
+
+    private static RoomTypeDef CreateServerRoom()
+    {
+        var pattern = CreatePattern(
+            "server_racks",
+            AnchorPlan.AlongWall,
+            new[]
+            {
+                Req(PropCategory.ServerRack, 2, 4, true, PlacementHint.AlongWall),
+                Req(PropCategory.NetworkCabinet, 1, 1, true, PlacementHint.Corner),
+                Req(PropCategory.UPS, 1, 2, true, PlacementHint.AlongWall),
+                Req(PropCategory.CableTray, 1, 2, false, PlacementHint.AlongWall),
+            },
+            new[]
+            {
+                Req(PropCategory.WarningSign, 0, 2, false, PlacementHint.NearDoor),
+                Req(PropCategory.ACUnit, 0, 1, true, PlacementHint.AlongWall),
+            },
+            2);
+
+        return CreateRoomDef(
+            RoomType.ServerRoom,
+            RoomTags.CorePreferred | RoomTags.Support | RoomTags.Tech | RoomTags.ResourceRoom,
+            3f, 7f, 3f, 7f,
+            0.05f, 0.95f, false, 0, 2,
+            new[] { pattern });
+    }
+
+    private static RoomTypeDef CreatePrintCopyRoom()
+    {
+        var pattern = CreatePattern(
+            "copy_corner",
+            AnchorPlan.AlongWall,
+            new[]
+            {
+                Req(PropCategory.PrinterCopier, 1, 1, true, PlacementHint.AlongWall),
+                Req(PropCategory.DocumentStack, 1, 3, false, PlacementHint.AlongWall),
+                Req(PropCategory.Cabinet, 1, 1, true, PlacementHint.AlongWall),
+            },
+            new[]
+            {
+                Req(PropCategory.TrashBin, 0, 1, false, PlacementHint.AlongWall),
+                Req(PropCategory.PlantSmall, 0, 1, false, PlacementHint.NearWindow),
+            },
+            2);
+
+        return CreateRoomDef(
+            RoomType.PrintCopyRoom,
+            RoomTags.Support | RoomTags.LootSource,
+            3f, 6f, 3f, 6f,
+            0.35f, 0.5f, false, 0, 2,
+            new[] { pattern });
+    }
+
+    private static RoomTypeDef CreateRestroom()
+    {
+        var pattern = CreatePattern(
+            "restroom_compact",
+            AnchorPlan.AlongWall,
+            new[]
+            {
+                Req(PropCategory.Sink, 1, 2, true, PlacementHint.AlongWall),
+                Req(PropCategory.WarningSign, 1, 1, false, PlacementHint.NearDoor),
+            },
+            new[]
+            {
+                Req(PropCategory.TrashBin, 0, 1, false, PlacementHint.AlongWall),
+            },
+            1);
+
+        return CreateRoomDef(
+            RoomType.Restroom,
+            RoomTags.CorePreferred | RoomTags.Support,
+            3f, 5f, 3f, 5f,
+            0.05f, 0.95f, false, 0, 2,
+            new[] { pattern });
+    }
+
+    private static RoomTypeDef CreateManagerOffice()
+    {
+        var pattern = CreatePattern(
+            "manager_office",
+            AnchorPlan.Center,
+            new[]
+            {
+                Req(PropCategory.Desk, 1, 1, true, PlacementHint.Center),
+                Req(PropCategory.Chair, 2, 3, false, PlacementHint.Center),
+                Req(PropCategory.Monitor, 1, 2, false, PlacementHint.Center),
+                Req(PropCategory.Cabinet, 1, 1, true, PlacementHint.AlongWall),
+            },
+            new[]
+            {
+                Req(PropCategory.Sofa, 0, 1, true, PlacementHint.NearWindow),
+                Req(PropCategory.TableSmall, 0, 1, true, PlacementHint.NearWindow),
+                Req(PropCategory.PlantLarge, 0, 1, true, PlacementHint.NearWindow),
+            },
+            3);
+
+        return CreateRoomDef(
+            RoomType.ManagerOffice,
+            RoomTags.FacadePreferred | RoomTags.FacadeRoom | RoomTags.RequiresWindow | RoomTags.LogicRoom,
+            4f, 7f, 4f, 7f,
+            0.85f, 0.25f, true, 0, 1,
             new[] { pattern });
     }
 

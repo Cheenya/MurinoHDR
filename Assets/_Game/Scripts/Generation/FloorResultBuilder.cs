@@ -115,7 +115,12 @@ public static class FloorResultBuilder
             case RoomCategory.Storage:
                 return RoomType.Warehouse;
             case RoomCategory.Utility:
-                return room.InstanceId.IndexOf("East", StringComparison.OrdinalIgnoreCase) >= 0 || style == FloorStyle.TechHeavy ? RoomType.TechCorridor : RoomType.VentSegment;
+                if (room.InstanceId.IndexOf("West", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return style == FloorStyle.TechHeavy ? RoomType.ServerRoom : RoomType.SecurityRoom;
+                }
+
+                return style == FloorStyle.TechHeavy ? RoomType.TechCorridor : RoomType.Restroom;
             case RoomCategory.ExitElevator:
                 return RoomType.ElevatorLobby;
             case RoomCategory.ExitShaft:
@@ -128,9 +133,19 @@ public static class FloorResultBuilder
                     return RoomType.KitchenBreak;
                 }
 
+                if (room.InstanceId.IndexOf("North", StringComparison.OrdinalIgnoreCase) >= 0 && style == FloorStyle.CabinetHeavy)
+                {
+                    return RoomType.ManagerOffice;
+                }
+
                 if (room.InstanceId.IndexOf("North", StringComparison.OrdinalIgnoreCase) >= 0 && style == FloorStyle.Representative)
                 {
                     return RoomType.MeetingRoom;
+                }
+
+                if (room.InstanceId.IndexOf("SouthWest", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return RoomType.PrintCopyRoom;
                 }
 
                 if (ordinal % 3 == 0 && style == FloorStyle.CabinetHeavy)
@@ -179,8 +194,22 @@ public static class FloorResultBuilder
             case RoomType.OpenSpace:
                 tags |= RoomTags.FacadePreferred | RoomTags.RequiresWindow;
                 break;
+            case RoomType.MeetingRoom:
+            case RoomType.ManagerOffice:
+                tags |= RoomTags.FacadePreferred | RoomTags.RequiresWindow | RoomTags.LogicRoom;
+                break;
             case RoomType.Warehouse:
                 tags |= RoomTags.ResourceRoom | RoomTags.Support | RoomTags.CorePreferred | RoomTags.LootSource;
+                break;
+            case RoomType.PrintCopyRoom:
+                tags |= RoomTags.Support | RoomTags.LootSource;
+                break;
+            case RoomType.SecurityRoom:
+                tags |= RoomTags.Support | RoomTags.LogicRoom | RoomTags.CorePreferred;
+                break;
+            case RoomType.ServerRoom:
+            case RoomType.Restroom:
+                tags |= RoomTags.Support | RoomTags.CorePreferred;
                 break;
             case RoomType.TechCorridor:
             case RoomType.VentSegment:

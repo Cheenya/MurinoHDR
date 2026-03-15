@@ -1,0 +1,337 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using MurinoHDR.Core;
+using MurinoHDR.Generation;
+using UnityEditor;
+using UnityEngine;
+
+namespace MurinoHDR.Editor
+{
+
+public sealed class BatchValidateSeedsWindow : EditorWindow
+{
+    [Serializable]
+    private sealed class BatchValidationEntry
+    {
+        public int Seed;
+        public int AttemptsUsed;
+        public bool Success;
+        public string Style = string.Empty;
+        public int Rooms;
+        public int Doors;
+        public int Windows;
+        public int Pickups;
+        public int Props;
+        public float FastPathSeconds;
+        public float LootPathSeconds;
+        public string TopErrors = string.Empty;
+        public string Warnings = string.Empty;
+    }
+
+    [Serializable]
+    private sealed class BatchValidationSummary
+    {
+        public string GeneratedAt = string.Empty;
+        public int StartSeed;
+        public int Count;
+        public int MaxAttempts;
+        public bool UseStyleOverride;
+        public string StyleOverride = string.Empty;
+        public float SuccessRate;
+        public float AverageAttempts;
+        public List<BatchValidationEntry> Entries = new List<BatchValidationEntry>();
+        public List<string> TopFailCodes = new List<string>();
+    }
+
+    private int _startSeed = 1000;
+    private int _count = 50;
+    private int _maxAttempts = 5;
+    private bool _useStyleOverride;
+    private FloorStyle _styleOverride = FloorStyle.CabinetHeavy;
+    private string _outputName = "batch_validation";
+    private Vector2 _scroll;
+    private string _lastSummary = string.Empty;
+
+    [MenuItem("Tools/Murino/Batch Validate Seeds...")]
+    public static void Open()
+    {
+        var window = GetWindow<BatchValidateSeedsWindow>("Batch Validate Seeds");
+        window.minSize = new Vector2(480f, 320f);
+    }
+
+    private void OnGUI()
+    {
+        _scroll = EditorGUILayout.BeginScrollView(_scroll);
+        EditorGUILayout.LabelField("Murino Batch Validation", EditorStyles.boldLabel);
+        _startSeed = EditorGUILayout.IntField("Start Seed", _startSeed);
+        _count = Mathf.Max(1, EditorGUILayout.IntField("Count", _count));
+        _maxAttempts = Mathf.Max(1, EditorGUILayout.IntField("Max Attempts", _maxAttempts));
+        _useStyleOverride = EditorGUILayout.Toggle("Override Style", _useStyleOverride);
+        using (new EditorGUI.DisabledScope(!_useStyleOverride))
+        {
+            _styleOverride = (FloorStyle)EditorGUILayout.EnumPopup("Style", _styleOverride);
+        }
+
+        _outputName = EditorGUILayout.TextField("Report Name", _outputName);
+        EditorGUILayout.Space(8f);
+        if (GUILayout.Button("Run Batch Validation", GUILayout.Height(28f)))
+        {
+            RunBatch();
+        }
+
+        if (!string.IsNullOrEmpty(_lastSummary))
+        {
+            EditorGUILayout.Space(12f);
+            EditorGUILayout.HelpBox(_lastSummary, MessageType.Info);
+        }
+
+        EditorGUILayout.EndScrollView();
+    }
+
+    private void RunBatch()
+    {
+        MvpRuntimeContent.EnsureInitialized();
+        var baseSettings = MvpRuntimeContent.Catalog.GeneratorSettings;
+        var settings = CloneSettings(baseSettings, _maxAttempts);
+        var reportRoot = Path.Combine(Directory.GetCurrentDirectory(), "Reports");
+        Directory.CreateDirectory(reportRoot);
+
+        var summary = new BatchValidationSummary();
+        summary.GeneratedAt = DateTime.UtcNow.ToString("O");
+        summary.StartSeed = _startSeed;
+        summary.Count = _count;
+        summary.MaxAttempts = _maxAttempts;
+        summary.UseStyleOverride = _useStyleOverride;
+        summary.StyleOverride = _useStyleOverride ? _styleOverride.ToString() : string.Empty;
+
+        var successCount = 0;
+        var totalAttempts = 0f;
+        var failCodeFrequency = new Dictionary<ValidationErrorCode, int>();
+
+        for (var i = 0; i < _count; i++)
+        {
+            var seed = _startSeed + i;
+            var generation = FloorGenerator.Generate(seed, settings, _useStyleOverride ? _styleOverride : (FloorStyle?)null);
+            var validation = FloorGenerator.Validate(generation, settings);
+            var detailed = validation.DetailedReport ?? generation.ValidationReport;
+            var entry = BuildEntry(seed, generation, detailed);
+            summary.Entries.Add(entry);
+            totalAttempts += entry.AttemptsUsed;
+
+            if (entry.Success)
+            {
+                successCount++;
+            }
+            else if (detailed != null)
+            {
+                foreach (var error in detailed.Errors)
+                {
+                    int count;
+                    failCodeFrequency.TryGetValue(error.Code, out count);
+                    failCodeFrequency[error.Code] = count + 1;
+                }
+            }
+        }
+
+        summary.SuccessRate = _count > 0 ? successCount / (float)_count : 0f;
+        summary.AverageAttempts = _count > 0 ? totalAttempts / _count : 0f;
+        summary.TopFailCodes = failCodeFrequency
+            .OrderByDescending(pair => pair.Value)
+            .Take(5)
+            .Select(pair => string.Format("{0}:{1}", pair.Key, pair.Value))
+            .ToList();
+
+        var baseName = string.IsNullOrWhiteSpace(_outputName) ? "batch_validation" : _outputName.Trim();
+        var csvPath = Path.Combine(reportRoot, baseName + ".csv");
+        var jsonPath = Path.Combine(reportRoot, baseName + ".json");
+        File.WriteAllText(csvPath, BuildCsv(summary));
+        File.WriteAllText(jsonPath, JsonUtility.ToJson(summary, true));
+
+        _lastSummary = string.Format(
+            "Success {0:P0}, avg attempts {1:0.00}, CSV: {2}, JSON: {3}",
+            summary.SuccessRate,
+            summary.AverageAttempts,
+            csvPath,
+            jsonPath);
+
+        Debug.Log(string.Format("[GEN] Batch validation finished. {0}", _lastSummary));
+    }
+
+    private static BatchValidationEntry BuildEntry(int seed, FloorGenerationResult generation, ValidationReport report)
+    {
+        var entry = new BatchValidationEntry();
+        entry.Seed = seed;
+        entry.AttemptsUsed = generation != null ? generation.AttemptIndex + 1 : 0;
+        entry.Success = report != null && report.Success;
+        entry.Style = generation != null ? generation.Style.ToString() : string.Empty;
+        if (generation != null && generation.FloorData != null)
+        {
+            entry.Rooms = generation.FloorData.Rooms.Count;
+            entry.Doors = generation.FloorData.Doors.Count;
+            entry.Windows = generation.FloorData.Windows.Count;
+            entry.Pickups = generation.FloorData.Pickups.Count;
+            entry.Props = generation.FloorData.Props.Count;
+        }
+
+        entry.FastPathSeconds = ComputeFastPathSeconds(generation, report);
+        entry.LootPathSeconds = ComputeLootPathSeconds(generation, report);
+        entry.TopErrors = BuildErrorList(report, ValidationSeverity.Error, ValidationSeverity.Fatal);
+        entry.Warnings = BuildErrorList(report, ValidationSeverity.Warning);
+        return entry;
+    }
+
+    private static float ComputeFastPathSeconds(FloorGenerationResult generation, ValidationReport report)
+    {
+        if (generation == null || generation.FloorData == null || report == null || report.Grid == null || report.DistanceFromSpawn == null)
+        {
+            return -1f;
+        }
+
+        var bestDistance = int.MaxValue;
+        for (var i = 0; i < generation.FloorData.Exits.Count; i++)
+        {
+            var cell = report.Grid.WorldToCell(generation.FloorData.Exits[i].WorldPos);
+            if (!report.Grid.InBounds(cell))
+            {
+                continue;
+            }
+
+            var distance = report.DistanceFromSpawn[report.Grid.Index(cell.x, cell.y)];
+            if (distance >= 0 && distance < bestDistance)
+            {
+                bestDistance = distance;
+            }
+        }
+
+        if (bestDistance == int.MaxValue)
+        {
+            return -1f;
+        }
+
+        return bestDistance * report.CellSize / 4.5f;
+    }
+
+    private static float ComputeLootPathSeconds(FloorGenerationResult generation, ValidationReport report)
+    {
+        if (generation == null || generation.FloorData == null || report == null || report.Grid == null || report.DistanceFromSpawn == null)
+        {
+            return -1f;
+        }
+
+        var farthest = -1;
+        for (var i = 0; i < generation.FloorData.Pickups.Count; i++)
+        {
+            if (!generation.FloorData.Pickups[i].RequiredForMainGate)
+            {
+                continue;
+            }
+
+            var cell = report.Grid.WorldToCell(generation.FloorData.Pickups[i].WorldPos);
+            if (!report.Grid.InBounds(cell))
+            {
+                continue;
+            }
+
+            farthest = Mathf.Max(farthest, report.DistanceFromSpawn[report.Grid.Index(cell.x, cell.y)]);
+        }
+
+        return farthest >= 0 ? farthest * report.CellSize / 4.5f : -1f;
+    }
+
+    private static string BuildErrorList(ValidationReport report, params ValidationSeverity[] severities)
+    {
+        if (report == null || report.Errors.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var accepted = new HashSet<ValidationSeverity>(severities);
+        var frequencies = new Dictionary<ValidationErrorCode, int>();
+        for (var i = 0; i < report.Errors.Count; i++)
+        {
+            var error = report.Errors[i];
+            if (!accepted.Contains(error.Severity))
+            {
+                continue;
+            }
+
+            int count;
+            frequencies.TryGetValue(error.Code, out count);
+            frequencies[error.Code] = count + 1;
+        }
+
+        return string.Join(";", frequencies.OrderByDescending(pair => pair.Value).Select(pair => string.Format("{0}:{1}", pair.Key, pair.Value)).Take(4).ToArray());
+    }
+
+    private static string BuildCsv(BatchValidationSummary summary)
+    {
+        var writer = new StringWriter();
+        writer.WriteLine("Seed,AttemptsUsed,Success,Style,Rooms,Doors,Windows,Pickups,Props,FastPathSeconds,LootPathSeconds,TopErrors,Warnings");
+        for (var i = 0; i < summary.Entries.Count; i++)
+        {
+            var entry = summary.Entries[i];
+            writer.WriteLine(string.Format(
+                "{0},{1},{2},{3},{4},{5},{6},{7},{8},{9:0.00},{10:0.00},\"{11}\",\"{12}\"",
+                entry.Seed,
+                entry.AttemptsUsed,
+                entry.Success ? 1 : 0,
+                entry.Style,
+                entry.Rooms,
+                entry.Doors,
+                entry.Windows,
+                entry.Pickups,
+                entry.Props,
+                entry.FastPathSeconds,
+                entry.LootPathSeconds,
+                entry.TopErrors,
+                entry.Warnings));
+        }
+
+        return writer.ToString();
+    }
+
+    private static FloorGeneratorSettings CloneSettings(FloorGeneratorSettings source, int maxAttempts)
+    {
+        var clone = ScriptableObject.CreateInstance<FloorGeneratorSettings>();
+        clone.hideFlags = HideFlags.HideAndDontSave;
+        var validation = CloneValidationConfig(source.ValidationConfig, maxAttempts);
+        clone.Configure(
+            source.CellSize,
+            source.FloorThickness,
+            source.WallHeight,
+            source.WallThickness,
+            source.ExtraRoomsMin,
+            source.ExtraRoomsMax,
+            source.ValidationRuns,
+            source.Templates,
+            validation,
+            source.OutsideThemeProfile,
+            source.OfficeRules);
+        return clone;
+    }
+
+    private static ValidationConfig CloneValidationConfig(ValidationConfig source, int maxAttempts)
+    {
+        var clone = new ValidationConfig();
+        if (source != null)
+        {
+            JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(source), clone);
+        }
+
+        SetPrivateField(clone, "_maxValidationAttempts", maxAttempts);
+        return clone;
+    }
+
+    private static void SetPrivateField(object target, string fieldName, object value)
+    {
+        var field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+        if (field != null)
+        {
+            field.SetValue(target, value);
+        }
+    }
+}
+}

@@ -53,10 +53,11 @@ public static class MvpEnvironmentBuilder
         public Material Accent;
         public Material Fixture;
         public Material DarkConcrete;
+        public Material Glass;
     }
 
     public const string RootName = "MVP_Environment";
-    public const string LayoutVersionName = "Layout_v7_GridValidatedOffice";
+    public const string LayoutVersionName = "Layout_v8_PropFilledOffice";
 
     private static MaterialPalette _palette;
 
@@ -121,9 +122,11 @@ public static class MvpEnvironmentBuilder
         var goals = goalsObject.AddComponent<FloorGoalController>();
         goals.EnsureDefaults();
 
+        ApplyTheme(result.OutsideTheme);
         BuildLighting(root.transform, result, settings);
         var roomLookup = BuildGeneratedRooms(root.transform, result, settings);
         BuildBoundaries(result, settings, roomLookup);
+        BuildFacadeWindows(root.transform, result.FloorData);
         BuildExitSetpieces(roomLookup, result, settings, goals);
         CreateRoomAnchors(result, settings, roomLookup);
         SpawnPickups(result.FloorData, roomLookup);
@@ -151,8 +154,8 @@ public static class MvpEnvironmentBuilder
         ambient.transform.rotation = Quaternion.Euler(55f, -35f, 0f);
         var directional = ambient.AddComponent<Light>();
         directional.type = LightType.Directional;
-        directional.intensity = 0.18f;
-        directional.color = new Color(0.72f, 0.75f, 0.82f);
+        directional.intensity = result.OutsideTheme != null ? result.OutsideTheme.DirectionalLightIntensity : 0.18f;
+        directional.color = result.OutsideTheme != null ? result.OutsideTheme.DirectionalLightColor : new Color(0.72f, 0.75f, 0.82f);
 
         var bounds = GetLayoutBounds(result, settings);
         var fill = new GameObject("HubFillLight");
@@ -162,7 +165,76 @@ public static class MvpEnvironmentBuilder
         point.type = LightType.Point;
         point.range = Mathf.Max(bounds.size.x, bounds.size.z) * 0.7f;
         point.intensity = 0.28f;
-        point.color = new Color(0.72f, 0.78f, 0.9f);
+        point.color = result.OutsideTheme != null ? result.OutsideTheme.WindowTint : new Color(0.72f, 0.78f, 0.9f);
+    }
+
+    private static void ApplyTheme(OutsideThemeProfile profile)
+    {
+        if (profile == null)
+        {
+            return;
+        }
+
+        RenderSettings.skybox = profile.SkyboxMaterial;
+        RenderSettings.ambientLight = profile.AmbientColor;
+        RenderSettings.ambientIntensity = profile.AmbientIntensity;
+    }
+
+    private static void BuildFacadeWindows(Transform root, FloorResult floorData)
+    {
+        if (floorData == null || floorData.Windows.Count == 0)
+        {
+            return;
+        }
+
+        var windowsRoot = new GameObject("Windows").transform;
+        windowsRoot.SetParent(root, false);
+        for (var i = 0; i < floorData.Windows.Count; i++)
+        {
+            var window = floorData.Windows[i];
+            var frameScale = window.Orientation == DoorOrientation.Horizontal
+                ? new Vector3(window.WidthMeters, 1.8f, 0.12f)
+                : new Vector3(0.12f, 1.8f, window.WidthMeters);
+            var glassScale = window.Orientation == DoorOrientation.Horizontal
+                ? new Vector3(Mathf.Max(0.4f, window.WidthMeters - 0.2f), 1.45f, 0.04f)
+                : new Vector3(0.04f, 1.45f, Mathf.Max(0.4f, window.WidthMeters - 0.2f));
+
+            var frame = CreateCube(windowsRoot, string.Format("WindowFrame_{0:00}", i), window.WorldPos, frameScale, GetPalette().Partition, false, Vector2.one);
+            var glass = CreateCube(windowsRoot, string.Format("WindowGlass_{0:00}", i), window.WorldPos, glassScale, GetPalette().Glass, false, Vector2.one);
+            glass.transform.position += window.Orientation == DoorOrientation.Horizontal ? Vector3.forward * 0.02f : Vector3.right * 0.02f;
+            CreateWindowParticles(windowsRoot, floorData.OutsideTheme, window, i);
+        }
+    }
+
+    private static void CreateWindowParticles(Transform parent, OutsideThemeProfile theme, WindowMarker window, int index)
+    {
+        if (theme == null || theme.ParticleRate <= 0.01f)
+        {
+            return;
+        }
+
+        var particlesObject = new GameObject(string.Format("WindowParticles_{0:00}", index));
+        particlesObject.transform.SetParent(parent, false);
+        particlesObject.transform.position = window.WorldPos + (window.Orientation == DoorOrientation.Horizontal ? Vector3.forward : Vector3.right) * 0.7f;
+        var system = particlesObject.AddComponent<ParticleSystem>();
+        var main = system.main;
+        main.loop = true;
+        main.startLifetime = 2.4f;
+        main.startSpeed = 0.25f;
+        main.startSize = 0.06f;
+        main.startColor = theme.ParticleTint;
+        var emission = system.emission;
+        emission.rateOverTime = theme.ParticleRate;
+        var shape = system.shape;
+        shape.shapeType = ParticleSystemShapeType.Box;
+        shape.scale = window.Orientation == DoorOrientation.Horizontal
+            ? new Vector3(window.WidthMeters, 0.8f, 0.1f)
+            : new Vector3(0.1f, 0.8f, window.WidthMeters);
+        var renderer = system.GetComponent<ParticleSystemRenderer>();
+        if (renderer != null)
+        {
+            renderer.material = GetPalette().Glass;
+        }
     }
 
     private static Dictionary<string, Transform> BuildGeneratedRooms(Transform root, FloorGenerationResult result, FloorGeneratorSettings settings)
@@ -493,28 +565,67 @@ public static class MvpEnvironmentBuilder
 
     private static void CreatePropVisual(Transform parent, PropInstance prop)
     {
-        var primitiveType = GetPrimitiveType(prop.Category);
-        var visual = GameObject.CreatePrimitive(primitiveType);
-        visual.name = string.Format("Prop_{0}_{1}", prop.Category, prop.PropId);
-        visual.transform.SetParent(parent, false);
-        visual.transform.position = prop.WorldBounds.center;
-        visual.transform.rotation = prop.Rotation;
-        visual.transform.localScale = prop.WorldBounds.size;
-
-        var renderer = visual.GetComponent<Renderer>();
-        if (renderer != null)
+        var prefabLibrary = MvpRuntimeContent.Catalog.PrefabLibrary;
+        var prefab = prefabLibrary != null ? prefabLibrary.GetAnyPrefab(prop.Category) : null;
+        GameObject visual;
+        if (prefab != null)
         {
-            renderer.sharedMaterial = GetPropMaterial(prop.Category);
+            visual = UnityEngine.Object.Instantiate(prefab, parent, false);
+            visual.name = string.Format("Prop_{0}_{1}", prop.Category, prop.PropId);
+            visual.transform.position = prop.WorldBounds.center;
+            visual.transform.rotation = prop.Rotation;
+            FitVisualToBounds(visual.transform, prop.WorldBounds.size);
+        }
+        else
+        {
+            var primitiveType = GetPrimitiveType(prop.Category);
+            visual = GameObject.CreatePrimitive(primitiveType);
+            visual.name = string.Format("Prop_{0}_{1}", prop.Category, prop.PropId);
+            visual.transform.SetParent(parent, false);
+            visual.transform.position = prop.WorldBounds.center;
+            visual.transform.rotation = prop.Rotation;
+            visual.transform.localScale = prop.WorldBounds.size;
+
+            var renderer = visual.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = GetPropMaterial(prop.Category);
+            }
         }
 
         if (!prop.BlocksMovement)
         {
-            var collider = visual.GetComponent<Collider>();
-            if (collider != null)
+            var colliders = visual.GetComponentsInChildren<Collider>();
+            for (var i = 0; i < colliders.Length; i++)
             {
-                UnityEngine.Object.DestroyImmediate(collider);
+                UnityEngine.Object.DestroyImmediate(colliders[i]);
             }
         }
+    }
+
+    private static void FitVisualToBounds(Transform visual, Vector3 targetSize)
+    {
+        var renderers = visual.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0)
+        {
+            visual.localScale = targetSize;
+            return;
+        }
+
+        var bounds = renderers[0].bounds;
+        for (var i = 1; i < renderers.Length; i++)
+        {
+            bounds.Encapsulate(renderers[i].bounds);
+        }
+
+        var sourceSize = bounds.size;
+        var scale = 1f;
+        if (sourceSize.x > 0.001f && sourceSize.y > 0.001f && sourceSize.z > 0.001f)
+        {
+            scale = Mathf.Min(targetSize.x / sourceSize.x, Mathf.Min(targetSize.y / sourceSize.y, targetSize.z / sourceSize.z));
+        }
+
+        visual.localScale = Vector3.one * scale;
     }
 
     private static PrimitiveType GetPrimitiveType(PropCategory category)
@@ -774,20 +885,22 @@ public static class MvpEnvironmentBuilder
             return _palette;
         }
 
+        var library = MvpRuntimeContent.Catalog.MaterialLibrary;
         _palette = new MaterialPalette();
-        _palette.ReceptionFloor = CreateMaterial("Mat_ReceptionFloor", new Color(0.27f, 0.29f, 0.33f), CreateCheckerTexture("Tex_Reception", new Color(0.2f, 0.23f, 0.28f), new Color(0.16f, 0.18f, 0.22f), new Color(0.33f, 0.37f, 0.41f)), 0.08f, 0.2f);
-        _palette.CorridorFloor = CreateMaterial("Mat_CorridorFloor", new Color(0.42f, 0.45f, 0.49f), CreateCheckerTexture("Tex_Corridor", new Color(0.35f, 0.38f, 0.42f), new Color(0.28f, 0.31f, 0.35f), new Color(0.56f, 0.59f, 0.63f)), 0.04f, 0.12f);
-        _palette.OfficeFloor = CreateMaterial("Mat_OfficeFloor", new Color(0.24f, 0.29f, 0.34f), CreateFabricTexture("Tex_OfficeCarpet", new Color(0.18f, 0.24f, 0.3f), new Color(0.12f, 0.17f, 0.22f)), 0.02f, 0.08f);
-        _palette.StorageFloor = CreateMaterial("Mat_StorageFloor", new Color(0.39f, 0.34f, 0.29f), CreateCheckerTexture("Tex_Storage", new Color(0.35f, 0.31f, 0.26f), new Color(0.28f, 0.24f, 0.2f), new Color(0.5f, 0.43f, 0.35f)), 0.03f, 0.06f);
-        _palette.UtilityFloor = CreateMaterial("Mat_UtilityFloor", new Color(0.3f, 0.33f, 0.31f), CreateCheckerTexture("Tex_Utility", new Color(0.23f, 0.26f, 0.24f), new Color(0.18f, 0.21f, 0.19f), new Color(0.4f, 0.44f, 0.41f)), 0.02f, 0.1f);
-        _palette.Ceiling = CreateMaterial("Mat_Ceiling", new Color(0.84f, 0.86f, 0.88f), CreateCheckerTexture("Tex_Ceiling", new Color(0.78f, 0.8f, 0.82f), new Color(0.74f, 0.76f, 0.78f), new Color(0.92f, 0.93f, 0.95f)), 0f, 0.02f);
-        _palette.WallPaint = CreateMaterial("Mat_WallPaint", new Color(0.81f, 0.83f, 0.86f), CreateNoiseTexture("Tex_Walls", new Color(0.75f, 0.77f, 0.8f), new Color(0.69f, 0.71f, 0.74f)), 0f, 0.03f);
-        _palette.Partition = CreateMaterial("Mat_Partition", new Color(0.67f, 0.7f, 0.74f), CreateNoiseTexture("Tex_Partition", new Color(0.62f, 0.66f, 0.7f), new Color(0.54f, 0.58f, 0.62f)), 0f, 0.05f);
+        _palette.ReceptionFloor = library != null && library.FloorMat != null ? library.FloorMat : CreateMaterial("Mat_ReceptionFloor", new Color(0.27f, 0.29f, 0.33f), CreateCheckerTexture("Tex_Reception", new Color(0.2f, 0.23f, 0.28f), new Color(0.16f, 0.18f, 0.22f), new Color(0.33f, 0.37f, 0.41f)), 0.08f, 0.2f);
+        _palette.CorridorFloor = library != null && library.FloorMat != null ? library.FloorMat : CreateMaterial("Mat_CorridorFloor", new Color(0.42f, 0.45f, 0.49f), CreateCheckerTexture("Tex_Corridor", new Color(0.35f, 0.38f, 0.42f), new Color(0.28f, 0.31f, 0.35f), new Color(0.56f, 0.59f, 0.63f)), 0.04f, 0.12f);
+        _palette.OfficeFloor = library != null && library.FloorMat != null ? library.FloorMat : CreateMaterial("Mat_OfficeFloor", new Color(0.24f, 0.29f, 0.34f), CreateFabricTexture("Tex_OfficeCarpet", new Color(0.18f, 0.24f, 0.3f), new Color(0.12f, 0.17f, 0.22f)), 0.02f, 0.08f);
+        _palette.StorageFloor = library != null && library.FloorMat != null ? library.FloorMat : CreateMaterial("Mat_StorageFloor", new Color(0.39f, 0.34f, 0.29f), CreateCheckerTexture("Tex_Storage", new Color(0.35f, 0.31f, 0.26f), new Color(0.28f, 0.24f, 0.2f), new Color(0.5f, 0.43f, 0.35f)), 0.03f, 0.06f);
+        _palette.UtilityFloor = library != null && library.FloorMat != null ? library.FloorMat : CreateMaterial("Mat_UtilityFloor", new Color(0.3f, 0.33f, 0.31f), CreateCheckerTexture("Tex_Utility", new Color(0.23f, 0.26f, 0.24f), new Color(0.18f, 0.21f, 0.19f), new Color(0.4f, 0.44f, 0.41f)), 0.02f, 0.1f);
+        _palette.Ceiling = library != null && library.CeilingMat != null ? library.CeilingMat : CreateMaterial("Mat_Ceiling", new Color(0.84f, 0.86f, 0.88f), CreateCheckerTexture("Tex_Ceiling", new Color(0.78f, 0.8f, 0.82f), new Color(0.74f, 0.76f, 0.78f), new Color(0.92f, 0.93f, 0.95f)), 0f, 0.02f);
+        _palette.WallPaint = library != null && library.WallMat != null ? library.WallMat : CreateMaterial("Mat_WallPaint", new Color(0.81f, 0.83f, 0.86f), CreateNoiseTexture("Tex_Walls", new Color(0.75f, 0.77f, 0.8f), new Color(0.69f, 0.71f, 0.74f)), 0f, 0.03f);
+        _palette.Partition = library != null && library.TrimMat != null ? library.TrimMat : CreateMaterial("Mat_Partition", new Color(0.67f, 0.7f, 0.74f), CreateNoiseTexture("Tex_Partition", new Color(0.62f, 0.66f, 0.7f), new Color(0.54f, 0.58f, 0.62f)), 0f, 0.05f);
         _palette.Metal = CreateMaterial("Mat_Metal", new Color(0.37f, 0.4f, 0.44f), CreateLinearTexture("Tex_Metal", new Color(0.32f, 0.35f, 0.38f), new Color(0.44f, 0.47f, 0.5f)), 0.22f, 0.48f);
         _palette.Wood = CreateMaterial("Mat_Wood", new Color(0.49f, 0.35f, 0.23f), CreateLinearTexture("Tex_Wood", new Color(0.43f, 0.29f, 0.18f), new Color(0.58f, 0.41f, 0.27f)), 0.05f, 0.16f);
         _palette.Accent = CreateMaterial("Mat_Accent", new Color(0.23f, 0.56f, 0.71f), CreateLinearTexture("Tex_Accent", new Color(0.18f, 0.44f, 0.56f), new Color(0.28f, 0.68f, 0.86f)), 0.1f, 0.22f);
         _palette.Fixture = CreateEmissiveMaterial("Mat_Fixture", new Color(0.92f, 0.93f, 0.88f), new Color(2.5f, 2.45f, 2.3f));
         _palette.DarkConcrete = CreateMaterial("Mat_DarkConcrete", new Color(0.26f, 0.28f, 0.31f), CreateNoiseTexture("Tex_Concrete", new Color(0.21f, 0.23f, 0.26f), new Color(0.3f, 0.32f, 0.35f)), 0.01f, 0.12f);
+        _palette.Glass = library != null && library.GlassMat != null ? library.GlassMat : CreateTransparentMaterial("Mat_Glass", new Color(0.6f, 0.78f, 0.92f, 0.45f));
         return _palette;
     }
 
@@ -810,6 +923,28 @@ public static class MvpEnvironmentBuilder
         {
             material.SetColor("_EmissionColor", emission);
             material.EnableKeyword("_EMISSION");
+        }
+        return material;
+    }
+
+    private static Material CreateTransparentMaterial(string name, Color tint)
+    {
+        var material = CreateMaterial(name, tint, null, 0f, 0.35f);
+        if (material.HasProperty("_Surface"))
+        {
+            material.SetFloat("_Surface", 1f);
+        }
+        if (material.HasProperty("_AlphaClip"))
+        {
+            material.SetFloat("_AlphaClip", 0f);
+        }
+        if (material.HasProperty("_BaseColor"))
+        {
+            material.SetColor("_BaseColor", tint);
+        }
+        if (material.HasProperty("_Color"))
+        {
+            material.SetColor("_Color", tint);
         }
         return material;
     }

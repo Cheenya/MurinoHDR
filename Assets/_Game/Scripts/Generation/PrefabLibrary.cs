@@ -47,6 +47,28 @@ public sealed class PrefabLibrary : ScriptableObject
     public GameObject PickupMarkerPrefab => _pickupMarkerPrefab;
     public GameObject DebugMarkerPrefab => _debugMarkerPrefab;
 
+    public GameObject GetAnyPrefab(PropCategory category)
+    {
+        for (var i = 0; i < _pools.Length; i++)
+        {
+            var pool = _pools[i];
+            if (pool == null || pool.Category != category || pool.Prefabs == null)
+            {
+                continue;
+            }
+
+            for (var prefabIndex = 0; prefabIndex < pool.Prefabs.Length; prefabIndex++)
+            {
+                if (pool.Prefabs[prefabIndex] != null)
+                {
+                    return pool.Prefabs[prefabIndex];
+                }
+            }
+        }
+
+        return null;
+    }
+
     public GameObject PickPrefab(PropCategory category, System.Random rng, AntiRepeatState state, int roomId)
     {
         for (var i = 0; i < _pools.Length; i++)

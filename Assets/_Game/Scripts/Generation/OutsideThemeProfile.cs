@@ -29,6 +29,32 @@ public sealed class OutsideThemeProfile : ScriptableObject
     public float ParticleRate => _particleRate;
     public int ParticlePresetId => _particlePresetId;
     public AudioClip AmbientLoop => _ambientLoop;
+
+    public void Configure(
+        string themeName,
+        Material skyboxMaterial,
+        Color ambientColor,
+        Color directionalLightColor,
+        float directionalLightIntensity,
+        float ambientIntensity,
+        Color windowTint,
+        Color particleTint,
+        float particleRate,
+        int particlePresetId,
+        AudioClip ambientLoop)
+    {
+        _themeName = string.IsNullOrEmpty(themeName) ? "Default" : themeName;
+        _skyboxMaterial = skyboxMaterial;
+        _ambientColor = ambientColor;
+        _directionalLightColor = directionalLightColor;
+        _directionalLightIntensity = directionalLightIntensity;
+        _ambientIntensity = ambientIntensity;
+        _windowTint = windowTint;
+        _particleTint = particleTint;
+        _particleRate = particleRate;
+        _particlePresetId = particlePresetId;
+        _ambientLoop = ambientLoop;
+    }
 }
 }
 

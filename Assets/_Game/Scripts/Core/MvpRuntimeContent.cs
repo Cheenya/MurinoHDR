@@ -11,16 +11,22 @@ public sealed class MvpContentCatalog : ScriptableObject
     [SerializeField] private ItemDefinition[] _items = System.Array.Empty<ItemDefinition>();
     [SerializeField] private CraftRecipe[] _recipes = System.Array.Empty<CraftRecipe>();
     [SerializeField] private FloorGeneratorSettings _generatorSettings;
+    [SerializeField] private PrefabLibrary _prefabLibrary;
+    [SerializeField] private MaterialLibrary _materialLibrary;
 
     public IReadOnlyList<ItemDefinition> Items => _items;
     public IReadOnlyList<CraftRecipe> Recipes => _recipes;
     public FloorGeneratorSettings GeneratorSettings => _generatorSettings;
+    public PrefabLibrary PrefabLibrary => _prefabLibrary;
+    public MaterialLibrary MaterialLibrary => _materialLibrary;
 
-    public void Configure(ItemDefinition[] items, CraftRecipe[] recipes, FloorGeneratorSettings generatorSettings)
+    public void Configure(ItemDefinition[] items, CraftRecipe[] recipes, FloorGeneratorSettings generatorSettings, PrefabLibrary prefabLibrary, MaterialLibrary materialLibrary)
     {
         _items = items;
         _recipes = recipes;
         _generatorSettings = generatorSettings;
+        _prefabLibrary = prefabLibrary;
+        _materialLibrary = materialLibrary;
     }
 }
 
@@ -73,14 +79,20 @@ public static class MvpRuntimeContent
         var stairsTemplate = CreateRoomTemplate("exit_stairs", RoomCategory.ExitStairs, new Vector2Int(4, 4), true);
 
         var validationConfig = new ValidationConfig();
-        var outsideTheme = CreateRuntimeAsset<OutsideThemeProfile>("DefaultOutsideTheme");
+        var winterTheme = CreateOutsideTheme("Winter", new Color(0.62f, 0.67f, 0.74f), new Color(0.83f, 0.87f, 0.95f), 0.22f, new Color(0.76f, 0.88f, 1f, 0.72f), new Color(0.88f, 0.92f, 1f, 0.55f), 18f, 1);
+        var summerTheme = CreateOutsideTheme("Summer", new Color(0.7f, 0.74f, 0.68f), new Color(1f, 0.96f, 0.87f), 0.26f, new Color(0.92f, 0.96f, 0.82f, 0.7f), new Color(0.78f, 0.9f, 0.62f, 0.4f), 8f, 2);
+        var nightTheme = CreateOutsideTheme("Night", new Color(0.2f, 0.24f, 0.33f), new Color(0.43f, 0.5f, 0.72f), 0.08f, new Color(0.38f, 0.56f, 0.82f, 0.8f), new Color(0.45f, 0.55f, 0.75f, 0.35f), 4f, 3);
+        var rainTheme = CreateOutsideTheme("Rain", new Color(0.45f, 0.5f, 0.56f), new Color(0.7f, 0.76f, 0.84f), 0.15f, new Color(0.6f, 0.76f, 0.92f, 0.78f), new Color(0.65f, 0.75f, 0.86f, 0.5f), 22f, 4);
+        var outsideTheme = winterTheme;
+        var prefabLibrary = CreateRuntimeAsset<PrefabLibrary>("DefaultPrefabLibrary");
+        var materialLibrary = CreateRuntimeAsset<MaterialLibrary>("DefaultMaterialLibrary");
         var officeRules = CreateRuntimeAsset<OfficeGenerationRules>("DefaultOfficeRules");
         officeRules.Configure(
             FloorStyle.CabinetHeavy,
             System.Array.Empty<FloorStyleProfile>(),
             System.Array.Empty<RoomPlacementRule>(),
             System.Array.Empty<AdjacencyRule>(),
-            new[] { outsideTheme },
+            new[] { winterTheme, summerTheme, nightTheme, rainTheme },
             2,
             1,
             1,
@@ -104,7 +116,7 @@ public static class MvpRuntimeContent
 
         var items = new[] { keycard, fuse, tape, repairedFuse, crowbar, rope, lockpick };
         var recipes = new[] { repairFuseRecipe };
-        _catalog.Configure(items, recipes, settings);
+        _catalog.Configure(items, recipes, settings, prefabLibrary, materialLibrary);
 
         ItemLookup.Clear();
         for (var i = 0; i < items.Length; i++)
@@ -132,6 +144,21 @@ public static class MvpRuntimeContent
         var item = CreateRuntimeAsset<ItemDefinition>(displayName.Replace(' ', '_'));
         item.Configure(id, displayName, stackable, maxStack, tags);
         return item;
+    }
+
+    private static OutsideThemeProfile CreateOutsideTheme(
+        string themeName,
+        Color ambientColor,
+        Color directionalColor,
+        float directionalIntensity,
+        Color windowTint,
+        Color particleTint,
+        float particleRate,
+        int particlePresetId)
+    {
+        var theme = CreateRuntimeAsset<OutsideThemeProfile>(themeName + "Theme");
+        theme.Configure(themeName, null, ambientColor, directionalColor, directionalIntensity, 1f, windowTint, particleTint, particleRate, particlePresetId, null);
+        return theme;
     }
 
     private static T CreateRuntimeAsset<T>(string name) where T : ScriptableObject
